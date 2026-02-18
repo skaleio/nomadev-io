@@ -1,0 +1,4 @@
+project_id = "rxgrhvrseejzbzneabrz"
+
+[functions.shopify-analytics]
+verify_jwt = false

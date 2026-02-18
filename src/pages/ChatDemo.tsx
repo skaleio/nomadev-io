@@ -1,0 +1,646 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { 
+  Shield, 
+  AlertTriangle, 
+  CheckCircle, 
+  Activity,
+  Users,
+  Eye,
+  Clock,
+  Package,
+  Bell,
+  Search,
+  User,
+  LogOut,
+  BarChart3,
+  Settings,
+  Truck,
+  MessageSquare,
+  ShoppingCart,
+  DollarSign,
+  Send,
+  Phone,
+  Video,
+  MoreVertical,
+  Smile,
+  Paperclip,
+  ChevronRight
+} from 'lucide-react';
+
+const ChatDemo = () => {
+  const navigate = useNavigate();
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+  
+  // Estados necesarios para la animación automática
+  const [messages, setMessages] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingText, setTypingText] = useState('');
+  const [whoIsTyping, setWhoIsTyping] = useState(null); // 'customer' or 'agent'
+  const [hasStarted, setHasStarted] = useState(false);
+  
+  const navigationItems = [
+    { title: "Dashboard", icon: BarChart3, id: "dashboard" },
+    { title: "Validador de Clientes", icon: Shield, id: "validation" },
+    { title: "Shopify Analytics", icon: ShoppingCart, id: "analytics" },
+    { title: "Chat en Vivo", icon: MessageSquare, id: "chat" },
+    { title: "Validación Pedidos", icon: CheckCircle, id: "orders" },
+    { title: "Seguimiento", icon: Truck, id: "tracking" },
+    { title: "Gestor de Leads", icon: Users, id: "leads" },
+    { title: "Configuración", icon: Settings, id: "settings" }
+  ];
+
+  const liveMetrics = [
+    { label: "Visitantes", value: "42", icon: Eye },
+    { label: "Ventas", value: "$2968", icon: DollarSign },
+    { label: "Sesiones", value: "195", icon: Clock },
+    { label: "Pedidos", value: "64", icon: Package }
+  ];
+
+  const activeChats = [
+    { 
+      id: 1, 
+      name: "María González", 
+      lastMessage: "¿Tienen este producto en stock?", 
+      time: "2 min", 
+      unread: 2,
+      status: "online",
+      avatar: "MG"
+    },
+    { 
+      id: 2, 
+      name: "Carlos Ruiz", 
+      lastMessage: "Necesito ayuda con mi pedido", 
+      time: "5 min", 
+      unread: 0,
+      status: "away",
+      avatar: "CR"
+    },
+    { 
+      id: 3, 
+      name: "Ana Martínez", 
+      lastMessage: "¿Cuál es el tiempo de entrega?", 
+      time: "8 min", 
+      unread: 1,
+      status: "online",
+      avatar: "AM"
+    },
+    { 
+      id: 4, 
+      name: "Luis Pérez", 
+      lastMessage: "Gracias por la ayuda", 
+      time: "12 min", 
+      unread: 0,
+      status: "offline",
+      avatar: "LP"
+    }
+  ];
+
+  // Conversación completa de demostración
+  const conversation = [
+    { sender: 'customer', text: 'Hola, ¿tienen el producto X en stock?', delay: 1000 },
+    { sender: 'agent', text: '¡Hola! Sí, tenemos ese producto disponible. ¿Te gustaría que te ayude con algo más?', delay: 2000 },
+    { sender: 'customer', text: 'Perfecto, ¿cuál es el tiempo de entrega?', delay: 1500 },
+    { sender: 'agent', text: 'El tiempo de entrega es de 2-3 días hábiles para tu zona. ¿Procedo con el pedido?', delay: 2500 },
+    { sender: 'customer', text: '¡Excelente! Sí, quiero comprarlo. ¿Cuál es el precio?', delay: 1800 },
+    { sender: 'agent', text: 'El precio es de $299 con envío gratis. Te envío el enlace de pago seguro 💳', delay: 2200 },
+    { sender: 'customer', text: 'Perfecto, procedo con la compra. Gracias por la atención!', delay: 1600 },
+    { sender: 'agent', text: '¡Gracias por tu compra! 🎉 Te enviaremos la confirmación por email. ¡Que tengas un excelente día!', delay: 2000 }
+  ];
+
+  const getCurrentSectionInfo = () => {
+    return {
+      title: "Chat en Vivo",
+      description: "Sistema de atención al cliente en tiempo real con múltiples canales de comunicación, gestión de conversaciones y métricas de rendimiento."
+    };
+  };
+
+  const getDemoRoute = (section: string) => {
+    const routeMap: { [key: string]: string } = {
+      'dashboard': '/interactive-demo',
+      'validation': '/validation-demo',
+      'analytics': '/shopify-demo',
+      'orders': '/orders-demo',
+      'tracking': '/tracking-demo',
+      'leads': '/leads-demo',
+      'settings': '/settings-demo'
+    };
+    return routeMap[section] || '/interactive-demo';
+  };
+
+  // Función para simular escritura de mensaje
+  const typeMessage = (text: string, speed: number = 50) => {
+    return new Promise<void>((resolve) => {
+      let i = 0;
+      setTypingText('');
+      const timer = setInterval(() => {
+        if (i < text.length) {
+          setTypingText(text.slice(0, i + 1));
+          i++;
+        } else {
+          clearInterval(timer);
+          resolve();
+        }
+      }, speed);
+    });
+  };
+
+  // Función principal para simular toda la conversación
+  const simulateConversation = async () => {
+    // Evitar múltiples ejecuciones
+    if (hasStarted) return;
+    setHasStarted(true);
+    
+    // Limpiar mensajes existentes antes de empezar
+    setMessages([]);
+    
+    for (let i = 0; i < conversation.length; i++) {
+      const message = conversation[i];
+      
+      // Esperar el delay antes de empezar a "escribir"
+      await new Promise(resolve => setTimeout(resolve, message.delay));
+      
+      // Mostrar indicador de "escribiendo"
+      setWhoIsTyping(message.sender);
+      setIsTyping(true);
+      
+      // Simular tiempo de escritura
+      await typeMessage(message.text);
+      
+      // Crear timestamp único para cada mensaje
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      // Agregar mensaje a la conversación
+      setMessages(prev => [...prev, {
+        id: `msg-${i}-${Date.now()}`, // ID único
+        text: message.text,
+        sender: message.sender,
+        timestamp: timestamp
+      }]);
+      
+      // Ocultar indicador de "escribiendo"
+      setIsTyping(false);
+      setWhoIsTyping(null);
+      setTypingText('');
+    }
+  };
+
+  // useEffect para iniciar la animación automáticamente
+  useEffect(() => {
+    // Iniciar la simulación después de 1 segundo
+    const timer = setTimeout(() => {
+      simulateConversation();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Función para reiniciar la demo
+  const resetDemo = () => {
+    // Limpiar todos los estados
+    setMessages([]);
+    setIsTyping(false);
+    setTypingText('');
+    setWhoIsTyping(null);
+    setHasStarted(false);
+    
+    // Reiniciar la conversación después de un breve delay
+    setTimeout(() => {
+      simulateConversation();
+    }, 500);
+  };
+
+  return (
+    <div className="min-h-screen bg-dashboard-bg">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 h-full w-64 bg-sidebar border-r border-sidebar-border z-40">
+        {/* Header del Sidebar */}
+        <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-lg font-semibold text-sidebar-foreground">test</h1>
+              <p className="text-xs text-muted-foreground">Dashboard</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="space-y-2 p-4">
+          {navigationItems.map((item, index) => {
+            const isActive = item.id === 'chat';
+            
+            return (
+              <div
+                key={index}
+                className={`nav-item group flex items-center px-3 py-2 rounded-lg transition-colors w-full text-left ${
+                  isActive
+                    ? 'bg-primary/10 text-primary border-l-4 border-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-primary'
+                }`}
+              >
+                <item.icon className="w-5 h-5 transition-colors mr-3" />
+                <span className="transition-colors">{item.title}</span>
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Métricas en Tiempo Real */}
+        <div className="p-4">
+          <div className="bg-gradient-to-br from-emerald-50/80 to-teal-50/80 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200/50 dark:border-emerald-800/50 rounded-xl p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full animate-pulse shadow-sm"></div>
+              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Métricas en Vivo</span>
+            </div>
+            
+            <div className="space-y-3">
+              {liveMetrics.map((metric, index) => (
+                <div key={index} className="flex items-center justify-between py-2 px-3 bg-white/60 dark:bg-white/5 rounded-lg backdrop-blur-sm border border-white/20 dark:border-white/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                      <metric.icon className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{metric.label}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{metric.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Status Indicator */}
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="glass-card p-3 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-success rounded-full animate-pulse-glow"></div>
+              <span className="text-sm font-medium text-sidebar-foreground">Sistema Activo</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Todos los servicios funcionando correctamente
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      {/* Header */}
+      <header className="fixed top-0 right-0 left-64 h-16 bg-card/80 backdrop-blur-xl border-b border-border z-30">
+        <div className="flex items-center h-full px-6">
+          {/* Search - Lado Izquierdo */}
+          <div className="flex items-center gap-4 w-80">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Buscar clientes, pedidos, chats..."
+                className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-border/50 rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
+                readOnly
+              />
+            </div>
+          </div>
+
+          {/* Logo en el centro */}
+          <div className="flex-1 flex items-center justify-center">
+            <div
+              className="text-2xl font-black text-emerald-600 transition-all duration-300 cursor-pointer tracking-wider uppercase animate-bounce"
+              style={{
+                fontFamily: "'Orbitron', 'Arial Black', sans-serif",
+                fontWeight: 900,
+                letterSpacing: '0.15em',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
+                transform: 'skew(-3deg)',
+                display: 'inline-block',
+                filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.5))',
+                animation: 'bounce 2s infinite, glow 3s ease-in-out infinite alternate'
+              }}
+            >
+              NOMADEV.IO
+            </div>
+          </div>
+
+          {/* User Actions - Lado Derecho */}
+          <div className="flex items-center gap-3 w-80 justify-end">
+            <div className="hidden md:flex items-center space-x-2 text-sm">
+              <span className="text-muted-foreground">Hola,</span>
+              <span className="font-medium">Usuario</span>
+            </div>
+            <div className="relative">
+              <Bell className="w-5 h-5 text-muted-foreground" />
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-red-600 rounded-full text-xs flex items-center justify-center text-white font-semibold shadow-lg border-2 border-background animate-pulse">
+                3
+              </span>
+            </div>
+            <User className="w-5 h-5 text-muted-foreground" />
+            <LogOut className="w-4 h-4 text-red-600" />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="pt-16 ml-64 min-h-screen">
+        <div className="p-6">
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">Chat en Vivo</h1>
+              <p className="text-muted-foreground">Sistema de atención al cliente en tiempo real</p>
+            </div>
+
+            {/* Métricas del Chat */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-card border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">Chats Activos</p>
+                      <p className="text-2xl font-bold text-foreground mt-1">23</p>
+                      <p className="text-emerald-500 text-sm mt-1">+15.2%</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <MessageSquare className="h-6 w-6 text-blue-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">Tiempo Promedio</p>
+                      <p className="text-2xl font-bold text-foreground mt-1">2m 34s</p>
+                      <p className="text-emerald-500 text-sm mt-1">-8.2%</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <Clock className="h-6 w-6 text-emerald-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">Satisfacción</p>
+                      <p className="text-2xl font-bold text-foreground mt-1">4.8/5</p>
+                      <p className="text-emerald-500 text-sm mt-1">+0.2</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <CheckCircle className="h-6 w-6 text-emerald-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card border-border">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-sm font-medium">Conversaciones</p>
+                      <p className="text-2xl font-bold text-foreground mt-1">3,891</p>
+                      <p className="text-emerald-500 text-sm mt-1">+8%</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted">
+                      <Activity className="h-6 w-6 text-purple-500" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Chat Interface */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Lista de Chats */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground flex items-center">
+                    <MessageSquare className="h-5 w-5 text-blue-500 mr-2" />
+                    Conversaciones Activas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {activeChats.map((chat) => (
+                      <div key={chat.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors cursor-pointer">
+                        <div className="relative">
+                          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-semibold text-primary">{chat.avatar}</span>
+                          </div>
+                          <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-background ${
+                            chat.status === 'online' ? 'bg-emerald-500' : 
+                            chat.status === 'away' ? 'bg-yellow-500' : 'bg-gray-400'
+                          }`}></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-foreground truncate">{chat.name}</p>
+                            <span className="text-xs text-muted-foreground">{chat.time}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{chat.lastMessage}</p>
+                        </div>
+                        {chat.unread > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            {chat.unread}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Chat Principal */}
+              <div className="lg:col-span-2">
+                <Card className="bg-card border-border h-[600px] flex flex-col">
+                  <CardHeader className="border-b border-border">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-semibold text-primary">MG</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-foreground">María González</h3>
+                          <p className="text-sm text-emerald-500">En línea</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={resetDemo}
+                          title="Reiniciar demo"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Video className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="flex-1 flex flex-col p-0">
+                    {/* Mensajes */}
+                    <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                      {/* Mensajes de la conversación animada */}
+                      {messages.map((msg) => (
+                        <div key={msg.id} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'} animate-fadeIn`}>
+                          <div className={`max-w-[70%] p-3 rounded-lg ${
+                            msg.sender === 'agent' 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-muted text-foreground'
+                          }`}>
+                            <p className="text-sm">{msg.text}</p>
+                            <p className="text-xs opacity-70 mt-1">{msg.timestamp}</p>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Indicador de "escribiendo" */}
+                      {isTyping && (
+                        <div className={`flex ${whoIsTyping === 'customer' ? 'justify-start' : 'justify-end'}`}>
+                          <div
+                            className={`max-w-[70%] p-3 rounded-lg ${
+                              whoIsTyping === 'customer'
+                                ? 'bg-muted text-foreground'
+                                : 'bg-primary text-primary-foreground'
+                            }`}
+                          >
+                            {typingText && (
+                              <p className="text-sm">{typingText}</p>
+                            )}
+                            <div className="flex space-x-1 mt-1">
+                              <div className={`w-2 h-2 rounded-full animate-bounce ${
+                                whoIsTyping === 'customer' ? 'bg-gray-500' : 'bg-white'
+                              }`} style={{ animationDelay: '0ms' }}></div>
+                              <div className={`w-2 h-2 rounded-full animate-bounce ${
+                                whoIsTyping === 'customer' ? 'bg-gray-500' : 'bg-white'
+                              }`} style={{ animationDelay: '150ms' }}></div>
+                              <div className={`w-2 h-2 rounded-full animate-bounce ${
+                                whoIsTyping === 'customer' ? 'bg-gray-500' : 'bg-white'
+                              }`} style={{ animationDelay: '300ms' }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Input de mensaje */}
+                    <div className="border-t border-border p-4">
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            placeholder="Escribe tu mensaje..."
+                            className="w-full px-3 py-2 bg-muted/50 border border-border/50 rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            readOnly
+                          />
+                        </div>
+                        <Button variant="ghost" size="sm">
+                          <Smile className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm">
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Cuadrito de información de la guía */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className="relative">
+          {/* Indicador de pulso */}
+          <div className="absolute inset-0 bg-emerald-500 rounded-full animate-ping opacity-20"></div>
+          <Button
+            onClick={() => setShowInfoTooltip(!showInfoTooltip)}
+            className="relative bg-emerald-600 hover:bg-emerald-700 text-white rounded-full w-14 h-14 shadow-2xl hover:shadow-emerald-500/25 transition-all duration-300 border-2 border-emerald-500/20 hover:border-emerald-400/40"
+            title="Información de la herramienta"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </Button>
+          
+          {/* Cuadrito de información */}
+          {showInfoTooltip && (
+            <div className="absolute bottom-16 right-0 w-80 bg-card border border-border rounded-lg shadow-2xl p-4 z-50">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="text-lg font-semibold text-foreground">{getCurrentSectionInfo().title}</h3>
+                <Button
+                  onClick={() => setShowInfoTooltip(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                {getCurrentSectionInfo().description}
+              </p>
+              <div className="flex justify-between">
+                <Button
+                  onClick={() => setShowInfoTooltip(false)}
+                  size="sm"
+                  variant="outline"
+                  className="border-border text-muted-foreground hover:text-foreground text-xs"
+                >
+                  Cerrar
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowInfoTooltip(false);
+                    // Navegar a la siguiente herramienta
+                    navigate(getDemoRoute('orders'));
+                  }}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs flex items-center gap-1"
+                >
+                  Siguiente
+                  <ChevronRight className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Estilos CSS para animaciones */}
+      <style jsx>{`
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default ChatDemo;
