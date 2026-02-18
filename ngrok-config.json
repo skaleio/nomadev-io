@@ -1,0 +1,10 @@
+{
+  "url": "https://f066052e0153.ngrok-free.app",
+  "port": 8081,
+  "timestamp": "2025-10-19T05:23:41.781Z",
+  "shopify": {
+    "app_url": "https://f066052e0153.ngrok-free.app",
+    "redirect_url": "https://f066052e0153.ngrok-free.app/auth/callback",
+    "webhook_url": "https://f066052e0153.ngrok-free.app/webhooks/shopify"
+  }
+}

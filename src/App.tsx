@@ -26,6 +26,8 @@ import ShopifyPage from "./pages/ShopifyPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
 import ShopifyConnectPage from "./pages/ShopifyConnectPage";
+import DropiPage from "./pages/DropiPage";
+import DropiConnectPage from "./pages/DropiConnectPage";
 import AuthSuccessPage from "./pages/AuthSuccessPage";
 import OrderValidationPage from "./pages/OrderValidationPage";
 import OrdersPage from "./pages/OrdersPage";
@@ -114,6 +116,8 @@ const AppContent = () => {
                        <Route path="/brand-identity" element={<ProtectedRoute><BrandIdentityPage /></ProtectedRoute>} />
                        <Route path="/website-builder" element={<ProtectedRoute><WebsiteBuilderPage /></ProtectedRoute>} />
                        <Route path="/shopify/connect" element={<ProtectedRoute><ShopifyConnectPage /></ProtectedRoute>} />
+                       <Route path="/dropi" element={<ProtectedRoute><DropiPage /></ProtectedRoute>} />
+                       <Route path="/dropi/connect" element={<ProtectedRoute><DropiConnectPage /></ProtectedRoute>} />
                        <Route path="/whatsapp-integration" element={<ProtectedRoute><WhatsAppIntegrationPage /></ProtectedRoute>} />
                        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
                        <Route path="/order-validation" element={<ProtectedRoute><OrderValidationPage /></ProtectedRoute>} />
