@@ -21,7 +21,7 @@ export function useShopifyConnection() {
     error: null
   });
 
-  // Verificar conexión con Shopify
+  // Verificar conexión con Shopify (lee shopify_connections primero, luego user_external_configs)
   const checkConnection = useCallback(async () => {
     if (!user?.id) {
       setStatus({
@@ -34,8 +34,55 @@ export function useShopifyConnection() {
 
     setStatus(prev => ({ ...prev, isLoading: true, error: null }));
 
+    const testShopifyToken = async (shopDomain: string, accessToken: string, lastConnected?: string) => {
+      const domain = shopDomain.replace(/\.myshopify\.com$/, '');
+      const res = await fetch(
+        `https://${domain}.myshopify.com/admin/api/2024-01/shop.json`,
+        {
+          headers: {
+            'X-Shopify-Access-Token': accessToken,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      if (res.ok) {
+        setStatus({
+          isConnected: true,
+          isLoading: false,
+          error: null,
+          shopDomain: domain,
+          lastConnected: lastConnected ?? undefined
+        });
+      } else {
+        setStatus({
+          isConnected: false,
+          isLoading: false,
+          error: 'Token de acceso inválido o expirado'
+        });
+      }
+    };
+
     try {
-      // Verificar si existe configuración de Shopify en la base de datos
+      // 1) Intentar shopify_connections (donde escribe el OAuth)
+      const { data: connection, error: connError } = await supabase
+        .from('shopify_connections')
+        .select('shop_domain, access_token, updated_at')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!connError && connection?.shop_domain && connection?.access_token) {
+        try {
+          await testShopifyToken(connection.shop_domain, connection.access_token, connection.updated_at);
+          return;
+        } catch {
+          // Token falló; seguir a user_external_configs
+        }
+      }
+
+      // 2) Fallback: user_external_configs (conexión manual / legacy)
       const { data: config, error: configError } = await supabase
         .from('user_external_configs')
         .select('*')
@@ -48,61 +95,26 @@ export function useShopifyConnection() {
         throw configError;
       }
 
-      if (!config) {
-        setStatus({
-          isConnected: false,
-          isLoading: false,
-          error: null
-        });
-        return;
-      }
-
-      // Verificar si la configuración tiene los datos necesarios
-      const configData = config.config_data;
-      if (!configData || !configData.shop_domain || !configData.access_token) {
-        setStatus({
-          isConnected: false,
-          isLoading: false,
-          error: 'Configuración incompleta'
-        });
-        return;
-      }
-
-      // Intentar hacer una petición de prueba a Shopify
-      try {
-        const testResponse = await fetch(
-          `https://${configData.shop_domain}.myshopify.com/admin/api/2024-01/shop.json`,
-          {
-            headers: {
-              'X-Shopify-Access-Token': configData.access_token,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (testResponse.ok) {
-          setStatus({
-            isConnected: true,
-            isLoading: false,
-            error: null,
-            shopDomain: configData.shop_domain,
-            lastConnected: config.updated_at
-          });
-        } else {
+      const configData = config?.config_data;
+      if (configData?.shop_domain && configData?.access_token) {
+        try {
+          await testShopifyToken(configData.shop_domain, configData.access_token, config?.updated_at);
+          return;
+        } catch {
           setStatus({
             isConnected: false,
             isLoading: false,
-            error: 'Token de acceso inválido o expirado'
+            error: 'Error al conectar con Shopify API'
           });
+          return;
         }
-      } catch (apiError) {
-        setStatus({
-          isConnected: false,
-          isLoading: false,
-          error: 'Error al conectar con Shopify API'
-        });
       }
 
+      setStatus({
+        isConnected: false,
+        isLoading: false,
+        error: null
+      });
     } catch (error) {
       console.error('Error verificando conexión Shopify:', error);
       setStatus({

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase, testSupabaseConnection } from '../integrations/supabase/client';
+import { supabase } from '../integrations/supabase/client';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { Tables } from '../integrations/supabase/types';
 
@@ -17,6 +17,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (userData: {
     email: string;
     password: string;
@@ -59,10 +60,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('🔍 Verificando sesión existente...');
         
-        // Timeout de seguridad: si la verificación tarda más de 5 segundos, continuar sin sesión
+        // Timeout de seguridad: si la verificación tarda más de 10s (proyecto puede estar "despertando"), continuar sin sesión
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('Timeout')), 5000);
+          timeoutId = setTimeout(() => reject(new Error('Timeout')), 10000);
         });
 
         let sessionResult;
@@ -89,7 +90,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         if (!isMounted) return;
         
-        const { data: { session } } = sessionResult;
+        const { data: { session }, error: sessionError } = sessionResult;
+        
+        // Si Supabase devuelve error (ej. refresh token inválido), limpiar sesión para que el próximo login sea limpio
+        if (sessionError) {
+          console.warn('⚠️ Error de sesión (ej. refresh token inválido), limpiando...', sessionError.message);
+          await supabase.auth.signOut();
+        }
         
         if (session?.user) {
           console.log('👤 Sesión encontrada:', session.user.email);
@@ -247,7 +254,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       setError(null);
-      setIsLoading(true);
+      // No usar setIsLoading(true) aquí: es solo para la verificación inicial de sesión.
+      // Si lo activamos, la app entera muestra "Cargando aplicación..." y si la petición
+      // se cuelga, el usuario se queda atascado.
       
       console.log('🚀 Iniciando proceso de login para:', email);
       
@@ -271,22 +280,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       
       console.log('📡 Enviando credenciales a Supabase...');
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // 35s para dar tiempo a que el proyecto Supabase "despierte" si está pausado (plan free)
+      const LOGIN_TIMEOUT_MS = 35000;
+      const loginPromise = supabase.auth.signInWithPassword({ email, password });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), LOGIN_TIMEOUT_MS);
       });
+      const result = await Promise.race([loginPromise, timeoutPromise]).catch((err: unknown) => {
+        if (err instanceof Error) throw err;
+        throw new Error(String(err));
+      });
+      const { data, error } = result;
 
       if (error) {
         console.error('❌ Error de autenticación:', error);
         setError(error.message);
-        setIsLoading(false);
         throw error;
       }
 
-      if (data.user) {
+      if (data?.user) {
         console.log('✅ Usuario autenticado exitosamente:', data.user.email);
-        
-        // Crear un perfil básico inmediatamente
         const userProfile = {
           id: data.user.id,
           email: data.user.email || '',
@@ -295,34 +308,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           isActive: true,
           createdAt: new Date().toISOString(),
         };
-        
         setUser(userProfile);
         console.log('👤 Perfil de usuario creado:', userProfile);
-        setIsLoading(false);
-        
-        // NO cargar perfil completo para evitar colgados
         console.log('🎉 Login completado exitosamente');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error en login:', error);
-      
-      // Manejo específico de diferentes tipos de errores
+      const msg = error instanceof Error ? error.message : String(error);
       let errorMessage = 'Error inesperado al iniciar sesión';
-      
-      if (error.message?.includes('Invalid login credentials')) {
+      if (msg.includes('Invalid login credentials')) {
         errorMessage = 'Email o contraseña incorrectos.';
-      } else if (error.message?.includes('Email not confirmed')) {
+      } else if (msg.includes('Email not confirmed')) {
         errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
-      } else if (error.message?.includes('Too many requests')) {
+      } else if (msg.includes('Too many requests')) {
         errorMessage = 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
-      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
-        errorMessage = 'Error de conexión. Verifica tu internet y vuelve a intentar.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
+        errorMessage = 'Error de conexión. Verifica tu internet y que la app pueda conectar con Supabase.';
+      } else if (msg === 'LOGIN_TIMEOUT' || msg.includes('tardando demasiado')) {
+        const isLocal = typeof window !== 'undefined' && window.location?.origin?.includes('localhost');
+        errorMessage = 'La conexión con Supabase tardó demasiado. Comprueba: 1) Que estés en el proyecto correcto en el Dashboard (Authentication > URL Configuration). 2) Si el proyecto está pausado, espera a que reactive. 3) Tu conexión a internet.';
+        if (isLocal && typeof window !== 'undefined' && window.location?.origin) {
+          errorMessage += ` En local, añade ${window.location.origin} en Authentication > URL Configuration > Redirect URLs.`;
+        }
+      } else if (msg) {
+        errorMessage = msg;
       }
-      
       setError(errorMessage);
-      setIsLoading(false);
+      throw error;
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      setError(null);
+      const redirectTo = `${window.location.origin}/dashboard`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo },
+      });
+      if (error) {
+        setError(error.message);
+        throw error;
+      }
+      // La redirección a Google la hace Supabase; al volver, onAuthStateChange actualizará el usuario
+    } catch (error: any) {
+      console.error('Error login con Google:', error);
+      setError(error?.message || 'Error al iniciar sesión con Google');
       throw error;
     }
   };
@@ -468,6 +499,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     isAuthenticated,
     login,
+    loginWithGoogle,
     register,
     logout,
     updateProfile,

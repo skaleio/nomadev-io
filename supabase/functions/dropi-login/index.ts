@@ -32,7 +32,7 @@ serve(async (req) => {
     if (!email || !password) {
       return new Response(
         JSON.stringify({ error: "Faltan email o contraseña" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -54,15 +54,10 @@ serve(async (req) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      const msg = data?.message ?? data?.error ?? "Error al iniciar sesión en Dropi";
       return new Response(
-        JSON.stringify({
-          error: data?.message ?? "Error al iniciar sesión en Dropi",
-          status: response.status,
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        JSON.stringify({ error: msg }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -70,25 +65,19 @@ serve(async (req) => {
     if (!token) {
       return new Response(
         JSON.stringify({ error: "Dropi no devolvió token" }),
-        {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     return new Response(
       JSON.stringify({ token, baseUrl }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("dropi-login error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Error de servidor" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

@@ -107,6 +107,16 @@ export default function ShopifyConnectPage() {
           <p className="text-gray-300">
             Conecta tu tienda Shopify para sincronizar productos, pedidos y métricas
           </p>
+          <div className="text-left text-sm text-gray-400 mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
+            <p className="font-medium text-gray-300 mb-2">Pasos:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>Ingresa el dominio de tu tienda (ej: mi-tienda).</li>
+              <li>Haz clic en &quot;Conectar Tienda&quot;.</li>
+              <li>Serás redirigido a Shopify para autorizar el acceso.</li>
+              <li>Inicia sesión en Shopify si te lo pide y acepta los permisos.</li>
+              <li>Volverás a Nomadev y tu tienda quedará conectada.</li>
+            </ol>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {error && (

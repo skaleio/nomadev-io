@@ -98,7 +98,8 @@ serve(async (req) => {
 
     // Generar state único para seguridad
     const state = crypto.randomUUID();
-    
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutos
+
     // Guardar el state en la base de datos para verificación posterior
     const { error: stateError } = await supabaseClient
       .from('shopify_oauth_states')
@@ -106,7 +107,9 @@ serve(async (req) => {
         state_token: state,
         user_id,
         shop_domain: cleanShop,
-        created_at: new Date().toISOString()
+        redirect_uri: REDIRECT_URI,
+        scopes: ['read_products', 'write_products', 'read_orders', 'write_orders', 'read_customers', 'write_customers', 'read_inventory', 'write_inventory', 'read_analytics', 'read_reports'],
+        expires_at: expiresAt,
       });
 
     if (stateError) {

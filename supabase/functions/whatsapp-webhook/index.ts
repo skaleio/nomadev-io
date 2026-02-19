@@ -34,7 +34,7 @@ serve(async (req) => {
       .from('webhook_logs')
       .insert({
         user_id: 'system', // System webhook
-        source: 'evolution',
+        source: 'whatsapp',
         event: webhookData.event,
         payload: webhookData,
         status: 'success'
@@ -139,7 +139,7 @@ async function processMessageUpdate(supabaseClient: any, updateData: any) {
   const messageId = updateData.key.id
   const status = updateData.update.status
 
-  // Map Evolution API status to our enum
+  // Map WhatsApp message status to our enum
   let messageStatus = 'SENT'
   switch (status) {
     case 'PENDING':

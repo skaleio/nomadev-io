@@ -6,7 +6,7 @@ Plataforma de agentes de IA con integración WhatsApp, CRM, workflows y análisi
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, shadcn/ui
 - **Backend:** Supabase (Auth, DB, Edge Functions)
-- **Integraciones:** Evolution API (WhatsApp), Shopify, n8n
+- **Integraciones:** Shopify, n8n; WhatsApp (API oficial Meta próximamente)
 
 ## Requisitos
 
@@ -21,7 +21,7 @@ npm install
 
 # Copiar variables de entorno
 cp .env.example .env
-# Editar .env con tus claves (Supabase, Evolution API, etc.)
+# Editar .env con tus claves (Supabase, etc.)
 
 # Desarrollo
 npm run dev
@@ -56,7 +56,6 @@ src/
 ## Documentación
 
 - [Configuración y variables de entorno](docs/SETUP.md)
-- [Evolution API (WhatsApp)](docs/evolution-api-setup.md)
 - [Integración frontend](docs/frontend-integration.md)
 
 ## Variables de entorno
@@ -64,7 +63,7 @@ src/
 Ver `.env.example` para la lista de variables. Las necesarias para desarrollo mínimo:
 
 - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` – Supabase
-- Opcional: Evolution API, Shopify, n8n (ver docs)
+- Opcional: Shopify, n8n (ver docs)
 
 ## Licencia
 

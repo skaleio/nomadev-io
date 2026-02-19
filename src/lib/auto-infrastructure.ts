@@ -37,7 +37,6 @@ export async function createUserInfrastructure(
 
     // 1. Crear esquema de base de datos único para el usuario
     const databaseSchema = `user_${userId.replace(/-/g, '_')}`;
-    const evolutionInstance = `nomadev_${userId.substring(0, 8)}`;
     const webhookUrl = `${import.meta.env.VITE_APP_URL}/webhooks/${userId}`;
 
     // 2. Crear esquema en la base de datos
@@ -46,26 +45,20 @@ export async function createUserInfrastructure(
       return { success: false, error: schemaResult.error };
     }
 
-    // 3. Crear instancia de Evolution API
-    const evolutionResult = await createEvolutionInstance(evolutionInstance, userEmail);
-    if (!evolutionResult.success) {
-      return { success: false, error: evolutionResult.error };
-    }
-
-    // 4. Generar claves API únicas
+    // 3. Generar claves API únicas
     const apiKeys = await generateUserApiKeys(userId);
 
-    // 5. Configurar webhooks
+    // 4. Configurar webhooks
     const webhookResult = await setupUserWebhooks(userId, webhookUrl);
     if (!webhookResult.success) {
       return { success: false, error: webhookResult.error };
     }
 
-    // 6. Guardar configuración en la base de datos
+    // 5. Guardar configuración en la base de datos
     const infrastructure: UserInfrastructure = {
       userId,
       databaseSchema,
-      evolutionInstance,
+      evolutionInstance: '', // Reservado; WhatsApp usará API oficial de Meta
       webhookUrl,
       apiKeys,
       isActive: true,
@@ -131,62 +124,6 @@ async function createUserDatabaseSchema(schemaName: string): Promise<{ success: 
 }
 
 /**
- * Crea una instancia de Evolution API para el usuario
- */
-async function createEvolutionInstance(
-  instanceName: string, 
-  userEmail: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const evolutionApiUrl = import.meta.env.VITE_EVOLUTION_API_URL;
-    const evolutionApiKey = import.meta.env.VITE_EVOLUTION_ADMIN_KEY;
-
-    if (!evolutionApiUrl || !evolutionApiKey) {
-      return { success: false, error: 'Evolution API no configurada' };
-    }
-
-    // Crear instancia usando Evolution API
-    const response = await fetch(`${evolutionApiUrl}/instance/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey
-      },
-      body: JSON.stringify({
-        instanceName,
-        qrcode: true,
-        integration: 'WHATSAPP-BAILEYS',
-        webhook: {
-          url: `${import.meta.env.VITE_APP_URL}/webhooks/evolution/${instanceName}`,
-          events: ['MESSAGES_UPSERT', 'CONNECTION_UPDATE']
-        },
-        settings: {
-          rejectCall: true,
-          msgRetryCounterCache: true,
-          userAgent: 'NOMADEV.IO',
-          markOnlineOnChat: true
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return { success: false, error: errorData.message || 'Error creando instancia Evolution' };
-    }
-
-    const result = await response.json();
-    console.log(`✅ Instancia Evolution creada: ${instanceName}`);
-    
-    return { success: true };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Error creando instancia Evolution' 
-    };
-  }
-}
-
-/**
  * Genera claves API únicas para el usuario
  */
 async function generateUserApiKeys(userId: string): Promise<UserInfrastructure['apiKeys']> {
@@ -195,7 +132,7 @@ async function generateUserApiKeys(userId: string): Promise<UserInfrastructure['
   
   return {
     supabase: `sk_${userId.substring(0, 8)}_${timestamp}_${randomSuffix}`,
-    evolution: `ev_${userId.substring(0, 8)}_${timestamp}_${randomSuffix}`,
+    evolution: '', // Reservado para futura API Meta
     webhook: `wh_${userId.substring(0, 8)}_${timestamp}_${randomSuffix}`
   };
 }

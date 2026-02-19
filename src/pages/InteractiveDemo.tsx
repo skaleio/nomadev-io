@@ -211,7 +211,7 @@ const InteractiveDemo = () => {
   const systemStatus = [
     { label: "Validador N8N", status: "Operativo", icon: Shield, count: "127 validaciones hoy" },
     { label: "Shopify Sync", status: "Sincronizado", icon: ShoppingCart, count: "Actualizado hace 2 min" },
-    { label: "Evolution API", status: "Conectado", icon: MessageSquare, count: "23 chats activos" }
+    { label: "WhatsApp (Meta API)", status: "Próximamente", icon: MessageSquare, count: "—" }
   ];
 
   const getCurrentSectionInfo = () => {

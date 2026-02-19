@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuthRedirect } from '../hooks/useAuthRedirect';
 import { useOnboardingRedirect } from '../hooks/useOnboardingRedirect';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +16,9 @@ const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userClicked, setUserClicked] = useState(false);
-  const { login, error, clearError, isLoading } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
+  const { login, loginWithGoogle, error, clearError } = useAuth();
   const navigate = useNavigate();
   
   // Hook para manejar redirección automática
@@ -45,6 +48,26 @@ const LoginPage = () => {
   React.useEffect(() => {
     setUserClicked(false);
     clearError();
+  }, []);
+
+  // Comprobar conexión con Supabase al cargar (no bloquea el formulario)
+  useEffect(() => {
+    let cancelled = false;
+    const timeoutMs = 12000;
+    const check = async () => {
+      try {
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), timeoutMs)
+        );
+        await Promise.race([sessionPromise, timeoutPromise]);
+        if (!cancelled) setConnectionOk(true);
+      } catch {
+        if (!cancelled) setConnectionOk(false);
+      }
+    };
+    check();
+    return () => { cancelled = true; };
   }, []);
 
   // Resetear el estado de clic cuando cambien los campos
@@ -80,13 +103,16 @@ const LoginPage = () => {
     
     console.log('✅ Usuario hizo clic en iniciar sesión - procediendo con login');
     clearError();
+    setIsSubmitting(true);
 
     try {
       await login(email, password);
-      // Redirigir después del login exitoso
-      navigate('/dashboard');
+      // No navegar aquí: useAuthRedirect redirige cuando user esté actualizado en estado.
+      // Así evitamos que ProtectedRoute vea user null y nos mande de vuelta a login.
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -220,9 +246,9 @@ const LoginPage = () => {
                   setUserClicked(true);
                 }}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold py-4 h-12 shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 text-base"
-                disabled={isLoading}
+                disabled={isSubmitting}
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Iniciando sesión...
@@ -248,10 +274,14 @@ const LoginPage = () => {
               type="button"
               variant="outline"
               className="w-full bg-white hover:bg-gray-50 text-gray-900 border-gray-300 hover:border-gray-400 font-medium py-4 h-12 shadow-sm hover:shadow-md transition-all duration-200 text-base"
-              onClick={() => {
-                console.log('🖱️ Botón de Google clickeado');
-                // Aquí iría la lógica de autenticación con Google
-                alert('Funcionalidad de Google en desarrollo');
+              disabled={isSubmitting}
+              onClick={async () => {
+                clearError();
+                try {
+                  await loginWithGoogle();
+                } catch {
+                  // Error ya mostrado en context
+                }
               }}
             >
               <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">

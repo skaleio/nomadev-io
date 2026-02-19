@@ -66,7 +66,7 @@ export function OnboardingWizard({ isOpen, onComplete, onSkip }: OnboardingWizar
     {
       id: 'env-vars',
       title: 'Configurar Variables de Entorno',
-      description: 'Configura las variables necesarias para conectar con Supabase, Evolution API y Shopify.',
+      description: 'Configura las variables necesarias para conectar con Supabase y Shopify.',
       icon: Key,
       isCompleted: areRequiredEnvVarsConfigured(),
       isRequired: true,
@@ -83,9 +83,9 @@ export function OnboardingWizard({ isOpen, onComplete, onSkip }: OnboardingWizar
     {
       id: 'whatsapp',
       title: 'Configurar WhatsApp',
-      description: 'Conecta tu instancia de WhatsApp para habilitar la funcionalidad de mensajería.',
+      description: 'Próximamente: API oficial de Meta para mensajería.',
       icon: MessageSquare,
-      isCompleted: envConfig.configuredVars.some(v => v.name === 'VITE_EVOLUTION_API_URL'),
+      isCompleted: false, // Pendiente integración Meta API
       isRequired: false
     },
     {
@@ -236,7 +236,7 @@ export function OnboardingWizard({ isOpen, onComplete, onSkip }: OnboardingWizar
                         </h4>
                         <ul className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
                           <li>• Gestionar pedidos de Shopify automáticamente</li>
-                          <li>• Enviar mensajes de WhatsApp con Evolution API</li>
+                          <li>• Enviar mensajes de WhatsApp (API oficial Meta próximamente)</li>
                           <li>• Validar clientes y procesar pagos</li>
                           <li>• Analizar métricas de ventas en tiempo real</li>
                           <li>• Automatizar flujos de trabajo con N8N</li>

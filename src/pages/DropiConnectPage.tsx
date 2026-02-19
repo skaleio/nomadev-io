@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Truck, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Truck, CheckCircle, AlertCircle, HelpCircle } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { dropiLogin, saveDropiConfig } from "@/lib/dropi-service";
 
 export default function DropiConnectPage() {
@@ -33,7 +39,12 @@ export default function DropiConnectPage() {
       setSuccess(true);
       setTimeout(() => navigate("/dropi"), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al conectar con Dropi");
+      const msg = err instanceof Error ? err.message : "Error al conectar con Dropi";
+      if (msg.toLowerCase().includes("access denied")) {
+        setError("Acceso denegado. Revisa email y contraseña. Si usas cuenta de pruebas, marca «Usar entorno de pruebas».");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -41,23 +52,26 @@ export default function DropiConnectPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-amber-900/30 to-slate-900 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md bg-gray-900/90 border-gray-700">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">Conexión exitosa</h2>
-              <p className="text-gray-300 mb-4">Dropi conectado. Redirigiendo...</p>
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-400" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[50vh] p-4">
+          <Card className="w-full max-w-md bg-gray-900/90 border-gray-700">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">Conexión exitosa</h2>
+                <p className="text-gray-300 mb-4">Dropi conectado. Redirigiendo...</p>
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-amber-900/30 to-slate-900 flex items-center justify-center p-4">
+    <DashboardLayout>
+    <div className="flex items-center justify-center min-h-[50vh] p-4">
       <Card className="w-full max-w-md bg-gray-900/90 border-gray-700 backdrop-blur-sm shadow-2xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -133,6 +147,22 @@ export default function DropiConnectPage() {
               </>
             )}
           </Button>
+          <Collapsible className="rounded-lg border border-amber-500/30 bg-amber-950/20">
+            <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-amber-200 hover:text-amber-100">
+              <span className="flex items-center gap-2">
+                <HelpCircle className="h-4 w-4" />
+                ¿No tienes acceso a la API? / Acceso denegado
+              </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3 pb-3 pt-0 text-xs text-amber-200/90 space-y-2">
+              <p>Si Dropi devuelve &quot;Access denied&quot;, suele ser porque la cuenta aún no tiene habilitado el acceso por API. Puedes hacer esto mientras tanto:</p>
+              <ul className="list-disc list-inside space-y-1 ml-1">
+                <li>En la web de Dropi, entra a <strong>Mis Integraciones</strong> y completa el campo <strong>Nombre de Tienda</strong> (y guarda). A veces es necesario para que den el acceso.</li>
+                <li>Contacta al soporte de Dropi y pide que activen el <strong>acceso API</strong> o integración para tu cuenta.</li>
+                <li>Cuando te lo activen, vuelve aquí y pulsa &quot;Conectar Dropi&quot; con el mismo email y contraseña.</li>
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="text-center">
             <Button
               variant="ghost"
@@ -145,5 +175,6 @@ export default function DropiConnectPage() {
         </CardContent>
       </Card>
     </div>
+    </DashboardLayout>
   );
 }

@@ -18,40 +18,43 @@ export const useAuthRedirect = () => {
       if (currentPath === '/login' || currentPath === '/register') {
         console.log('Usuario ya autenticado, verificando si necesita onboarding...');
         
-        // Verificar si el usuario necesita onboarding
+        const SHOP_CHECK_TIMEOUT_MS = 4000;
+        
         const checkOnboardingStatus = async () => {
           try {
-            const { data: shops, error } = await supabase
+            const shopsPromise = supabase
               .from('shops')
               .select('id, is_active')
               .eq('user_id', user.id)
               .eq('is_active', true);
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('timeout')), SHOP_CHECK_TIMEOUT_MS)
+            );
+            const { data: shops, error } = await Promise.race([shopsPromise, timeoutPromise]).catch(() => ({
+              data: null,
+              error: { message: 'timeout' }
+            })) as { data: { id: string }[] | null; error: { message: string } | null };
 
-            if (error) {
-              console.error('Error verificando tiendas:', error);
-              // En caso de error, ir al dashboard por defecto
+            if (error || !shops) {
+              if (error?.message === 'timeout') console.warn('Verificación de tiendas lenta, yendo al dashboard');
+              else console.error('Error verificando tiendas:', error);
               navigate('/dashboard', { replace: true });
               return;
             }
 
-            // Si no tiene tiendas activas, verificar si ya completó onboarding
-            if (!shops || shops.length === 0) {
+            if (shops.length === 0) {
               const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
-              
               if (!hasSeenOnboarding) {
                 console.log('🎯 Usuario nuevo sin tienda, redirigiendo al onboarding...');
                 navigate('/onboarding', { replace: true });
               } else {
-                console.log('Usuario ya completó onboarding, redirigiendo al dashboard...');
                 navigate('/dashboard', { replace: true });
               }
             } else {
-              console.log('Usuario con tienda conectada, redirigiendo al dashboard...');
               navigate('/dashboard', { replace: true });
             }
-          } catch (error) {
-            console.error('Error en checkOnboardingStatus:', error);
-            // En caso de error, ir al dashboard por defecto
+          } catch (err) {
+            console.error('Error en checkOnboardingStatus:', err);
             navigate('/dashboard', { replace: true });
           }
         };

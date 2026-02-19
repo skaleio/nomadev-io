@@ -63,12 +63,10 @@ export function useEnvConfig() {
     switch (feature) {
       case 'supabase':
         return isVarConfigured('VITE_SUPABASE_URL') && isVarConfigured('VITE_SUPABASE_ANON_KEY');
-      case 'evolution':
-        return isVarConfigured('VITE_EVOLUTION_API_URL') && isVarConfigured('VITE_EVOLUTION_INSTANCE');
       case 'shopify':
         return isVarConfigured('VITE_SHOPIFY_API_KEY');
       case 'whatsapp':
-        return isVarConfigured('VITE_EVOLUTION_API_URL') && isVarConfigured('VITE_EVOLUTION_INSTANCE');
+        return false; // Próximamente: API oficial de Meta
       default:
         return false;
     }
@@ -78,7 +76,6 @@ export function useEnvConfig() {
   const getFeaturesStatus = useCallback(() => {
     return {
       supabase: isFeatureAvailable('supabase'),
-      evolution: isFeatureAvailable('evolution'),
       shopify: isFeatureAvailable('shopify'),
       whatsapp: isFeatureAvailable('whatsapp'),
       allRequired: checkRequiredVars()

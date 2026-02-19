@@ -6,7 +6,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
-import { EvolutionProvider } from "./contexts/EvolutionContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import { LoadingScreen } from "./components/ui/loading-logo";
@@ -141,13 +140,11 @@ const App = () => (
       <AuthProvider>
         <NotificationsProvider>
           <WebSocketProvider>
-            <EvolutionProvider>
-              <TooltipProvider>
-                <CustomCursor>
-                  <AppContent />
-                </CustomCursor>
-              </TooltipProvider>
-            </EvolutionProvider>
+            <TooltipProvider>
+              <CustomCursor>
+                <AppContent />
+              </CustomCursor>
+            </TooltipProvider>
           </WebSocketProvider>
         </NotificationsProvider>
       </AuthProvider>

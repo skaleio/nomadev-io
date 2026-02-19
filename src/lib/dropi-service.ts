@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 const getSupabaseUrl = () => import.meta.env.VITE_SUPABASE_URL;
 const getAnonKey = () => import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-/** Llama a la Edge Function dropi-login y devuelve { token, baseUrl } */
+/** Llama a la Edge Function dropi-login y devuelve { token, baseUrl }.
+ * La función siempre devuelve 200; los errores vienen en body.error para poder mostrar el mensaje de Dropi. */
 export async function dropiLogin(
   email: string,
   password: string,
@@ -13,9 +14,15 @@ export async function dropiLogin(
     body: { email, password, useTest },
   });
 
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  if (!data?.token || !data?.baseUrl) throw new Error("Dropi no devolvió token");
+  if (error) {
+    throw new Error(error.message || "Error al conectar con la función de Dropi");
+  }
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+  if (!data?.token || !data?.baseUrl) {
+    throw new Error("Dropi no devolvió token");
+  }
 
   return { token: data.token, baseUrl: data.baseUrl };
 }

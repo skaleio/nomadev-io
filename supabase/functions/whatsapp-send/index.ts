@@ -106,47 +106,8 @@ serve(async (req) => {
       conversationId = newConversation.id
     }
 
-    // Send message via Evolution API
-    const evolutionApiUrl = Deno.env.get('EVOLUTION_API_URL')
-    const evolutionApiKey = Deno.env.get('EVOLUTION_API_KEY')
-    const evolutionInstance = Deno.env.get('EVOLUTION_INSTANCE')
-
-    if (!evolutionApiUrl || !evolutionApiKey || !evolutionInstance) {
-      return new Response(
-        JSON.stringify({ error: 'Configuración de WhatsApp no encontrada' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    const messageResponse = await fetch(`${evolutionApiUrl}/message/sendText/${evolutionInstance}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey,
-      },
-      body: JSON.stringify({
-        number: phoneNumber,
-        text: message,
-      }),
-    })
-
-    if (!messageResponse.ok) {
-      const errorData = await messageResponse.text()
-      console.error('Error enviando mensaje:', errorData)
-      return new Response(
-        JSON.stringify({ error: 'Error enviando mensaje por WhatsApp' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    const messageData = await messageResponse.json()
-    const messageId = messageData.key?.id || `msg_${Date.now()}`
+    // WhatsApp: se usará la API oficial de Meta cuando esté configurada
+    const messageId = `msg_${Date.now()}`
 
     // Save message to database
     const { data: savedMessage, error: messageError } = await supabaseClient

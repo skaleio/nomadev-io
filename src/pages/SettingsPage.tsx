@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,34 +9,39 @@ import { Settings, Database, Zap, MessageSquare, Users, ShoppingBag, Globe, Shie
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useShopifyConnection } from "@/hooks/useShopifyConnection";
 
 export default function SettingsPage() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  
-  // Integraciones principales del SaaS
+  const navigate = useNavigate();
+  const { isConnected: isShopifyConnected, isLoading: isShopifyLoading } = useShopifyConnection();
+
+  // Integraciones principales del SaaS (estado real para Shopify)
   const integrations = [
     {
       name: "Shopify Integration",
       description: "Conectar tiendas y sincronizar pedidos",
       icon: ShoppingBag,
-      status: "pending" as const,
-      action: "Conectar Tienda"
+      status: (isShopifyLoading ? "pending" : isShopifyConnected ? "connected" : "pending") as "pending" | "connected",
+      action: "Conectar Tienda",
+      href: "/shopify/connect"
     },
     {
       name: "WhatsApp",
       description: "WhatsApp Business para chat en tiempo real",
       icon: MessageSquare,
       status: "connected" as const,
-      action: "Configurar"
+      action: "Configurar",
+      href: "/whatsapp-integration"
     }
   ];
 
   // Configuraciones del sistema
   const systemConfigs = [
     {
-      name: "Validación Automática",
-      description: "Activar validación automática de pedidos",
+      name: "Validaci?n Autom?tica",
+      description: "Activar validaci?n autom?tica de pedidos",
       icon: Shield,
       enabled: true,
       type: "toggle"
@@ -48,14 +54,14 @@ export default function SettingsPage() {
       type: "toggle"
     },
     {
-      name: "Chat Automático",
-      description: "Respuestas automáticas en WhatsApp",
+      name: "Chat Autom?tico",
+      description: "Respuestas autom?ticas en WhatsApp",
       icon: MessageSquare,
       enabled: true,
       type: "toggle"
     },
     {
-      name: "Backup Automático",
+      name: "Backup Autom?tico",
       description: "Respaldo diario de datos",
       icon: Database,
       enabled: true,
@@ -68,10 +74,10 @@ export default function SettingsPage() {
       <div className="space-y-6 animate-fade-in">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gradient mb-2">
-            Configuración del Sistema
+            Configuraci?n del Sistema
           </h1>
           <p className="text-muted-foreground">
-            Gestiona integraciones, configuraciones y parámetros de NOMADEV.IO
+            Gestiona integraciones, configuraciones y par?metros de NOMADEV.IO
           </p>
         </div>
 
@@ -105,14 +111,14 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Información del Usuario */}
+        {/* Informaci?n del Usuario */}
         <Card className="glass-card p-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
                 <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              Información del Usuario
+              Informaci?n del Usuario
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -198,7 +204,11 @@ export default function SettingsPage() {
                     <StatusBadge status={integration.status}>
                       {integration.status === "pending" ? "Pendiente" : "Conectado"}
                     </StatusBadge>
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => integration.href && navigate(integration.href)}
+                    >
                       {integration.action}
                     </Button>
                   </div>
@@ -264,9 +274,13 @@ export default function SettingsPage() {
                   <div>
                     <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Conectar Shopify</h4>
                     <p className="text-sm text-yellow-600 dark:text-yellow-400 mb-3">
-                      Conecta tu tienda Shopify para sincronizar pedidos y productos automáticamente.
+                      Conecta tu tienda Shopify para sincronizar pedidos y productos autom?ticamente.
                     </p>
-                    <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                    <Button
+                      size="sm"
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                      onClick={() => navigate('/shopify/connect')}
+                    >
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Conectar Tienda
                     </Button>
@@ -280,7 +294,7 @@ export default function SettingsPage() {
                   <div>
                     <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">Conectar WhatsApp</h4>
                     <p className="text-sm text-green-600 dark:text-green-400 mb-3">
-                      Conecta tu número de WhatsApp Business para comenzar a chatear con tus clientes.
+                      Conecta tu n?mero de WhatsApp Business para comenzar a chatear con tus clientes.
                     </p>
                     <Button size="sm" variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
                       <ExternalLink className="w-4 h-4 mr-2" />

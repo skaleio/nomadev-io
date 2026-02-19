@@ -71,7 +71,7 @@ export class N8NWebhookService {
         type: 'chat_update',
         data,
         timestamp: Date.now(),
-        source: 'evolution-api'
+        source: 'whatsapp'
       };
 
       const response = await fetch(this.webhookUrl, {
@@ -94,7 +94,7 @@ export class N8NWebhookService {
         type: 'lead_update',
         data,
         timestamp: Date.now(),
-        source: 'evolution-api'
+        source: 'whatsapp'
       };
 
       const response = await fetch(this.webhookUrl, {
@@ -117,7 +117,7 @@ export class N8NWebhookService {
         type: 'validation_update',
         data,
         timestamp: Date.now(),
-        source: 'evolution-api'
+        source: 'whatsapp'
       };
 
       const response = await fetch(this.webhookUrl, {
@@ -140,7 +140,7 @@ export class N8NWebhookService {
         type: 'sale_update',
         data,
         timestamp: Date.now(),
-        source: 'evolution-api'
+        source: 'whatsapp'
       };
 
       const response = await fetch(this.webhookUrl, {

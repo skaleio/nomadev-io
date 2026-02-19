@@ -92,14 +92,11 @@ export function useInfrastructureFeature(feature: string) {
     switch (feature) {
       case 'database':
         return !!infrastructure.databaseSchema;
-      case 'evolution':
-        return !!infrastructure.evolutionInstance;
       case 'webhooks':
         return !!infrastructure.webhookUrl;
       case 'all':
         return !!(
           infrastructure.databaseSchema &&
-          infrastructure.evolutionInstance &&
           infrastructure.webhookUrl
         );
       default:
@@ -135,7 +132,6 @@ export function useInfrastructureInfo() {
         message: 'Infraestructura inactiva',
         details: [
           `Esquema DB: ${infrastructure.databaseSchema}`,
-          `Instancia Evolution: ${infrastructure.evolutionInstance}`,
           `Webhook: ${infrastructure.webhookUrl}`
         ]
       };
@@ -146,7 +142,6 @@ export function useInfrastructureInfo() {
       message: 'Infraestructura activa y funcionando',
       details: [
         `Esquema DB: ${infrastructure.databaseSchema}`,
-        `Instancia Evolution: ${infrastructure.evolutionInstance}`,
         `Webhook: ${infrastructure.webhookUrl}`,
         `Creada: ${new Date(infrastructure.createdAt).toLocaleDateString()}`
       ]

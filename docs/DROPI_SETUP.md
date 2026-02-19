@@ -17,7 +17,7 @@ En el `.env` del frontend no hace falta nada específico para Dropi (ya usas `VI
 
 ## 2. Desplegar las Edge Functions de Dropi
 
-Tienes que desplegar las dos funciones en tu proyecto de Supabase.
+Tienes que desplegar las dos funciones en tu proyecto de Supabase. La función `dropi-login` devuelve siempre HTTP 200 y envía los errores de Dropi (credenciales incorrectas, etc.) en el body, para que la app muestre el mensaje real y no "Edge Function returned a non-2xx status code".
 
 Desde la raíz del proyecto (donde está `supabase/functions/`):
 

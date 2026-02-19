@@ -255,7 +255,6 @@ export class InputValidator {
       'www.nomadev.io',
       'supabase.co',
       'shopify.com',
-      'evolution.com',
       'localhost'
     ];
     

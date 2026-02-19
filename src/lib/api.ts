@@ -339,11 +339,10 @@ export const whatsappApi = {
 
   // Obtener estado del servicio
   getStatus: async () => {
-    // Verificar si hay configuración de Evolution API
     return { 
-      connected: true, 
-      service: 'Evolution API',
-      status: 'active'
+      connected: false, 
+      service: 'WhatsApp (API Meta próximamente)',
+      status: 'pending'
     };
   },
 };
