@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useShopifyConnection } from "@/hooks/useShopifyConnection";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { DropiOrdersPanel } from "@/components/orders/DropiOrdersPanel";
 import { 
   Package, 
   CheckCircle, 
@@ -29,7 +34,8 @@ import {
   Filter,
   Download,
   Plus,
-  Settings
+  Settings,
+  ShoppingBag
 } from "lucide-react";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -72,6 +78,7 @@ interface Order {
   status: 'pending_validation' | 'validating' | 'validated' | 'rejected' | 'shipped' | 'delivered';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   total_amount: number;
+  currency?: string;
   items: Array<{
     name: string;
     quantity: number;
@@ -87,8 +94,12 @@ interface Order {
 }
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { isConnected, isLoading: isConnectionLoading } = useShopifyConnection();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
@@ -96,72 +107,74 @@ export default function OrdersPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(30);
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [sourceTab, setSourceTab] = useState<'shopify' | 'dropi'>('dropi');
 
-  // Datos reales - lista vacía hasta conectar con Shopify
-  const mockOrders: Order[] = [];
+  const metricCounts = {
+    total: orders.length,
+    pending: orders.filter(o => o.status === 'pending_validation' || o.status === 'validating').length,
+    validated: orders.filter(o => o.status === 'validated' || o.status === 'shipped' || o.status === 'delivered').length,
+    rejected: orders.filter(o => o.status === 'rejected').length,
+  };
 
-  // Métricas principales
   const orderMetrics = [
     {
       title: "Total Pedidos",
-      value: "0",
+      value: String(metricCounts.total),
       change: { value: 0, type: "increase" as const },
       icon: Package,
       color: "primary" as const
     },
     {
       title: "Pendientes",
-      value: "0",
+      value: String(metricCounts.pending),
       change: { value: 0, type: "increase" as const },
       icon: Clock,
       color: "warning" as const
     },
     {
       title: "Validados",
-      value: "0",
+      value: String(metricCounts.validated),
       change: { value: 0, type: "increase" as const },
       icon: CheckCircle,
       color: "success" as const
     },
     {
       title: "Rechazados",
-      value: "0",
+      value: String(metricCounts.rejected),
       change: { value: 0, type: "increase" as const },
       icon: XCircle,
       color: "destructive" as const
     }
   ];
 
-  useEffect(() => {
-    loadOrders();
-  }, []);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
+    if (!isConnected) {
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      // TODO: Implementar conexión real a Supabase cuando esté listo
-      // const { data, error } = await supabase
-      //   .from('orders')
-      //   .select('*')
-      //   .order('created_at', { ascending: false });
-      // 
-      // if (error) {
-      //   console.error('Error fetching orders:', error);
-      //   setOrders([]);
-      // } else {
-      //   setOrders(data || []);
-      // }
-      
-      // Por ahora, usar lista vacía
-      setOrders([]);
+      setLoadError(null);
+      const { data, error } = await supabase.functions.invoke('shopify-orders', {
+        body: { limit: 50, status: 'any' },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setOrders(Array.isArray(data?.orders) ? (data.orders as Order[]) : []);
     } catch (error) {
       console.error('Error loading orders:', error);
+      setLoadError(error instanceof Error ? error.message : 'Error cargando pedidos');
       setOrders([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [isConnected]);
+
+  useEffect(() => {
+    if (isConnectionLoading) return;
+    loadOrders();
+  }, [isConnectionLoading, loadOrders]);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,15 +221,19 @@ export default function OrdersPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP'
-    }).format(amount);
+  const formatCurrency = (amount: number, currency?: string) => {
+    try {
+      return new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency: currency || 'USD'
+      }).format(amount);
+    } catch {
+      return `${(currency || 'USD')} ${amount.toFixed(2)}`;
+    }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('es-CL', {
+    return new Date(dateString).toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -224,6 +241,8 @@ export default function OrdersPage() {
       minute: '2-digit'
     });
   };
+
+  const showingNotConnected = !isConnectionLoading && !isConnected;
 
   return (
     <DashboardLayout>
@@ -233,9 +252,23 @@ export default function OrdersPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white">Gestión de Pedidos</h1>
-            <p className="text-gray-400 mt-1">Administra y valida todos los pedidos de tu tienda</p>
+            <p className="text-gray-400 mt-1">Shopify en vivo o importación Dropi desde Excel</p>
           </div>
-          <div className="flex gap-2">
+          <Tabs value={sourceTab} onValueChange={(v) => setSourceTab(v as 'shopify' | 'dropi')} className="w-full sm:w-auto">
+            <TabsList className="bg-gray-800 border border-gray-700">
+              <TabsTrigger value="dropi" className="data-[state=active]:bg-gray-700">Dropi (Excel)</TabsTrigger>
+              <TabsTrigger value="shopify" className="data-[state=active]:bg-gray-700">Shopify</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {sourceTab === 'dropi' && (
+          <DropiOrdersPanel userId={user?.id} />
+        )}
+
+        {sourceTab === 'shopify' && (
+        <>
+        <div className="flex justify-end gap-2">
             <Button 
               variant="outline" 
               size="sm"
@@ -249,8 +282,43 @@ export default function OrdersPage() {
               <Plus className="w-4 h-4 mr-2" />
               Nuevo Pedido
             </Button>
-          </div>
         </div>
+
+        {/* Banner: no hay tienda conectada */}
+        {showingNotConnected && (
+          <Card className="bg-yellow-900/20 border-yellow-700/50">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-6 h-6 text-yellow-400 flex-shrink-0" />
+                <div>
+                  <h3 className="text-white font-semibold">Conecta tu tienda Shopify</h3>
+                  <p className="text-sm text-gray-300">Sin tienda conectada no podemos cargar tus pedidos reales.</p>
+                </div>
+              </div>
+              <Button onClick={() => navigate('/shopify/connect')}>
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                Conectar Shopify
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Banner: error cargando pedidos */}
+        {isConnected && loadError && (
+          <Card className="bg-red-900/20 border-red-700/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <XCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-white font-semibold">Error al cargar pedidos</h3>
+                <p className="text-sm text-gray-300">{loadError}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={loadOrders}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reintentar
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Métricas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -350,9 +418,9 @@ export default function OrdersPage() {
                     : 'Conecta tu tienda Shopify para ver los pedidos aquí'
                   }
                 </p>
-                {!searchTerm && statusFilter === 'all' && priorityFilter === 'all' && (
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
+                {!searchTerm && statusFilter === 'all' && priorityFilter === 'all' && !isConnected && (
+                  <Button onClick={() => navigate('/shopify/connect')}>
+                    <ShoppingBag className="w-4 h-4 mr-2" />
                     Conectar Shopify
                   </Button>
                 )}
@@ -378,7 +446,7 @@ export default function OrdersPage() {
                               <span className="text-gray-300">{order.customer_name}</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-white font-semibold">{formatCurrency(order.total_amount)}</span>
+                              <span className="text-white font-semibold">{formatCurrency(order.total_amount, order.currency)}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -465,7 +533,7 @@ export default function OrdersPage() {
                         <span className="text-gray-300">{selectedOrder.payment_method}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-white font-semibold">{formatCurrency(selectedOrder.total_amount)}</span>
+                        <span className="text-white font-semibold">{formatCurrency(selectedOrder.total_amount, selectedOrder.currency)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -484,7 +552,7 @@ export default function OrdersPage() {
                             <span className="text-white font-medium">{item.name}</span>
                             <p className="text-gray-400 text-sm">Cantidad: {item.quantity}</p>
                           </div>
-                          <span className="text-white font-semibold">{formatCurrency(item.price)}</span>
+                          <span className="text-white font-semibold">{formatCurrency(item.price, selectedOrder.currency)}</span>
                         </div>
                       ))}
                     </div>
@@ -517,6 +585,8 @@ export default function OrdersPage() {
               </div>
             </DialogContent>
           </Dialog>
+        )}
+        </>
         )}
       </div>
     </DashboardLayout>

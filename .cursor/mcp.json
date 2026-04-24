@@ -1,11 +1,3 @@
 {
-  "mcpServers": {
-    "nomadev": {
-      "url": "https://mcp.supabase.com/mcp?project_ref=rxgrhvrseejzbzneabrz"
-    },
-    "shopify-dev-mcp": {
-      "command": "cmd",
-      "args": ["/k", "npx", "-y", "@shopify/dev-mcp@latest"]
-    }
-  }
+  "mcpServers": {}
 }

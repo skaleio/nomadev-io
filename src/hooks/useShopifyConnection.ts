@@ -10,9 +10,7 @@ export interface ShopifyConnectionStatus {
   lastConnected?: string;
 }
 
-/**
- * Hook para verificar el estado de conexión con Shopify
- */
+// Fuente única de verdad: tabla `shopify_connections` (escrita por shopify-oauth-callback).
 export function useShopifyConnection() {
   const { user } = useAuth();
   const [status, setStatus] = useState<ShopifyConnectionStatus>({
@@ -21,7 +19,6 @@ export function useShopifyConnection() {
     error: null
   });
 
-  // Verificar conexión con Shopify (lee shopify_connections primero, luego user_external_configs)
   const checkConnection = useCallback(async () => {
     if (!user?.id) {
       setStatus({
@@ -34,86 +31,32 @@ export function useShopifyConnection() {
 
     setStatus(prev => ({ ...prev, isLoading: true, error: null }));
 
-    const testShopifyToken = async (shopDomain: string, accessToken: string, lastConnected?: string) => {
-      const domain = shopDomain.replace(/\.myshopify\.com$/, '');
-      const res = await fetch(
-        `https://${domain}.myshopify.com/admin/api/2024-01/shop.json`,
-        {
-          headers: {
-            'X-Shopify-Access-Token': accessToken,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      if (res.ok) {
-        setStatus({
-          isConnected: true,
-          isLoading: false,
-          error: null,
-          shopDomain: domain,
-          lastConnected: lastConnected ?? undefined
-        });
-      } else {
-        setStatus({
-          isConnected: false,
-          isLoading: false,
-          error: 'Token de acceso inválido o expirado'
-        });
-      }
-    };
-
     try {
-      // 1) Intentar shopify_connections (donde escribe el OAuth)
       const { data: connection, error: connError } = await supabase
         .from('shopify_connections')
-        .select('shop_domain, access_token, updated_at')
+        .select('shop_domain, updated_at')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (!connError && connection?.shop_domain && connection?.access_token) {
-        try {
-          await testShopifyToken(connection.shop_domain, connection.access_token, connection.updated_at);
-          return;
-        } catch {
-          // Token falló; seguir a user_external_configs
-        }
+      if (connError) {
+        throw connError;
       }
 
-      // 2) Fallback: user_external_configs (conexión manual / legacy)
-      const { data: config, error: configError } = await supabase
-        .from('user_external_configs')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('service_name', 'shopify')
-        .eq('is_active', true)
-        .single();
-
-      if (configError && configError.code !== 'PGRST116') {
-        throw configError;
+      if (!connection?.shop_domain) {
+        setStatus({ isConnected: false, isLoading: false, error: null });
+        return;
       }
 
-      const configData = config?.config_data;
-      if (configData?.shop_domain && configData?.access_token) {
-        try {
-          await testShopifyToken(configData.shop_domain, configData.access_token, config?.updated_at);
-          return;
-        } catch {
-          setStatus({
-            isConnected: false,
-            isLoading: false,
-            error: 'Error al conectar con Shopify API'
-          });
-          return;
-        }
-      }
-
+      const domain = connection.shop_domain.replace(/\.myshopify\.com$/, '');
       setStatus({
-        isConnected: false,
+        isConnected: true,
         isLoading: false,
-        error: null
+        error: null,
+        shopDomain: domain,
+        lastConnected: connection.updated_at ?? undefined
       });
     } catch (error) {
       console.error('Error verificando conexión Shopify:', error);
@@ -125,7 +68,6 @@ export function useShopifyConnection() {
     }
   }, [user?.id]);
 
-  // Verificar conexión al cargar y cuando cambie el usuario
   useEffect(() => {
     checkConnection();
   }, [checkConnection]);
@@ -136,12 +78,9 @@ export function useShopifyConnection() {
   };
 }
 
-/**
- * Hook simplificado para obtener solo el estado de conexión
- */
 export function useShopifyConnectionStatus() {
   const { isConnected, isLoading, error } = useShopifyConnection();
-  
+
   return {
     isConnected,
     isLoading,

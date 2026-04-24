@@ -87,5 +87,65 @@ Puedes dar esto a quien use la plataforma:
 
 ## Próximos pasos (después de la conexión)
 
-- Ver **pedidos** en la app: ver plan en `docs/SHOPIFY_PLAN.md` (Edge Function `shopify-orders` y conectar OrdersPage).
+- Ver **pedidos** en la app: ya implementado vía Edge Function `shopify-orders` y `OrdersPage` (ruta `/orders`).
 - Opcional: sincronizar pedidos/productos en BD con webhooks (Fase 2 del plan).
+
+---
+
+## Checklist de deploy a producción
+
+### 1. Supabase (backend)
+
+**Aplicar migraciones** al proyecto de producción:
+```bash
+npx supabase link --project-ref TU_PROJECT_REF
+npx supabase db push
+```
+Debe existir: `shopify_oauth_states`, `shopify_connections`, `shopify_activity_log`, `shopify_webhooks`.
+
+**Desplegar Edge Functions**:
+```bash
+npx supabase functions deploy shopify-oauth-start
+npx supabase functions deploy shopify-oauth-callback --no-verify-jwt
+npx supabase functions deploy shopify-orders
+```
+Nota: `shopify-oauth-callback` debe desplegarse con `--no-verify-jwt` porque Shopify la llama sin JWT. Las demás requieren JWT del usuario.
+
+**Secrets de Edge Functions** (Dashboard → Project Settings → Edge Functions → Secrets):
+
+| Variable | Valor |
+|----------|-------|
+| `SHOPIFY_API_KEY` | Client ID de la app en Shopify Partners |
+| `SHOPIFY_API_SECRET` | Client secret de la app |
+| `FRONTEND_URL` | URL pública del frontend (ej: `https://nomadev-io.vercel.app`) |
+| `SHOPIFY_REDIRECT_URI` | *(opcional)* si está sin definir se usa `SUPABASE_URL/functions/v1/shopify-oauth-callback` |
+
+`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY` están inyectadas automáticamente por Supabase en las Edge Functions.
+
+### 2. Shopify Partners
+
+En tu app (Configuration → App setup → Allowed redirection URL(s)), añade **exactamente**:
+```
+https://TU_PROJECT_REF.supabase.co/functions/v1/shopify-oauth-callback
+```
+Sin barra final, con `https://`. Debe coincidir con `SHOPIFY_REDIRECT_URI` / `SUPABASE_URL` configurado.
+
+### 3. Frontend (Vercel u hosting)
+
+Variables de entorno de build:
+
+| Variable | Valor |
+|----------|-------|
+| `VITE_SUPABASE_URL` | `https://TU_PROJECT_REF.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | anon key del proyecto Supabase |
+
+(Opcional: `VITE_WS_URL` si usas el servidor WebSocket.)
+
+En Supabase Auth → URL Configuration, añade la URL del frontend al listado de "Redirect URLs" si tu flujo de login así lo requiere.
+
+### 4. Verificación
+
+1. Login en producción → Configuración → Conectar Tienda.
+2. Autoriza en Shopify, debe volver a `/auth/success` y luego a `/shopify`.
+3. En Configuración el badge de Shopify pasa a **Conectado**.
+4. Entra a `/orders` → debe listar pedidos reales de la tienda.

@@ -66,9 +66,9 @@ serve(async (req) => {
       );
     }
 
-    // Configuración de OAuth de Shopify
-    const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
-    const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
+    // Configuración de OAuth de Shopify (acepta API_KEY/SECRET o CLIENT_ID/SECRET)
+    const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY') || Deno.env.get('SHOPIFY_CLIENT_ID');
+    const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET') || Deno.env.get('SHOPIFY_CLIENT_SECRET');
     const REDIRECT_URI = Deno.env.get('SHOPIFY_REDIRECT_URI') || `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-oauth-callback`;
 
     if (!SHOPIFY_API_KEY || !SHOPIFY_API_SECRET) {

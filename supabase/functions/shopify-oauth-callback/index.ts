@@ -130,9 +130,9 @@ serve(async (req) => {
     const userId = stateData.user_id;
     const shopDomain = stateData.shop_domain;
 
-    // Configuración de Shopify
-    const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY');
-    const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET');
+    // Configuración de Shopify (acepta API_KEY/SECRET o CLIENT_ID/SECRET)
+    const SHOPIFY_API_KEY = Deno.env.get('SHOPIFY_API_KEY') || Deno.env.get('SHOPIFY_CLIENT_ID');
+    const SHOPIFY_API_SECRET = Deno.env.get('SHOPIFY_API_SECRET') || Deno.env.get('SHOPIFY_CLIENT_SECRET');
     const REDIRECT_URI = stateData.redirect_uri || `${Deno.env.get('SUPABASE_URL')}/functions/v1/shopify-oauth-callback`;
 
     if (!SHOPIFY_API_KEY || !SHOPIFY_API_SECRET) {

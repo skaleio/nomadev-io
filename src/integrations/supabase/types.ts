@@ -454,6 +454,162 @@ export type Database = {
           user_id?: string
         }
       }
+      dropi_meta_spend_snapshots: {
+        Row: {
+          id: string
+          user_id: string
+          period_start: string
+          period_end: string
+          meta_ad_spend: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          period_start: string
+          period_end: string
+          meta_ad_spend?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          period_start?: string
+          period_end?: string
+          meta_ad_spend?: number
+          updated_at?: string
+        }
+      }
+      dropi_order_imports: {
+        Row: {
+          id: string
+          user_id: string
+          source_filename: string
+          row_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source_filename: string
+          row_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          source_filename?: string
+          row_count?: number
+          created_at?: string
+        }
+      }
+      dropi_orders: {
+        Row: {
+          id: string
+          user_id: string
+          import_id: string | null
+          dropi_numeric_id: number
+          report_date: string | null
+          order_date: string
+          order_time: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          customer_email: string | null
+          status_raw: string
+          status_bucket: string
+          department: string | null
+          city: string | null
+          address: string | null
+          notes: string | null
+          carrier: string | null
+          guide_number: string | null
+          invoice_number: string | null
+          invoiced_amount: number | null
+          product_sale_amount: number | null
+          profit: number | null
+          shipping_price: number | null
+          return_shipping_cost: number | null
+          commission: number | null
+          supplier_total: number | null
+          categories: string | null
+          store_name: string | null
+          store_order_id: string | null
+          shop_order_number: string | null
+          raw: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          import_id?: string | null
+          dropi_numeric_id: number
+          report_date?: string | null
+          order_date: string
+          order_time?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          customer_email?: string | null
+          status_raw: string
+          status_bucket: string
+          department?: string | null
+          city?: string | null
+          address?: string | null
+          notes?: string | null
+          carrier?: string | null
+          guide_number?: string | null
+          invoice_number?: string | null
+          invoiced_amount?: number | null
+          product_sale_amount?: number | null
+          profit?: number | null
+          shipping_price?: number | null
+          return_shipping_cost?: number | null
+          commission?: number | null
+          supplier_total?: number | null
+          categories?: string | null
+          store_name?: string | null
+          store_order_id?: string | null
+          shop_order_number?: string | null
+          raw?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          import_id?: string | null
+          dropi_numeric_id?: number
+          report_date?: string | null
+          order_date?: string
+          order_time?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          customer_email?: string | null
+          status_raw?: string
+          status_bucket?: string
+          department?: string | null
+          city?: string | null
+          address?: string | null
+          notes?: string | null
+          carrier?: string | null
+          guide_number?: string | null
+          invoice_number?: string | null
+          invoiced_amount?: number | null
+          product_sale_amount?: number | null
+          profit?: number | null
+          shipping_price?: number | null
+          return_shipping_cost?: number | null
+          commission?: number | null
+          supplier_total?: number | null
+          categories?: string | null
+          store_name?: string | null
+          store_order_id?: string | null
+          shop_order_number?: string | null
+          raw?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
