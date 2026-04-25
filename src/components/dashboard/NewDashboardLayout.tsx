@@ -28,9 +28,11 @@ import {
   CreditCard,
   Keyboard,
   UserPlus,
-  Plus
+  Plus,
+  Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 import { supabase } from "../../integrations/supabase/client";
 import { useNotifications } from "../../hooks/useNotifications";
@@ -86,18 +88,26 @@ import {
 } from "../ui/dialog";
 import { Input } from "../ui/input";
 
-const navigationItems = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof BarChart3;
+  locked?: boolean;
+  comingSoonNote?: string;
+};
+
+const navigationItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
-  { title: "Validador de Clientes", url: "/validation", icon: Shield },
-  { title: "CRM", url: "/crm", icon: UserCheck },
   { title: "Gestión de Pedidos", url: "/orders", icon: Package },
-  { title: "Shopify Analytics", url: "/shopify", icon: ShoppingBag },
-  { title: "Dropi", url: "/dropi", icon: Box },
-  { title: "Studio IA", url: "/studio-ia", icon: Sparkles },
-  { title: "Chat en Vivo", url: "/chat", icon: MessageSquare },
-  { title: "Validación Pedidos", url: "/order-validation", icon: CheckCircle },
-  { title: "Seguimiento", url: "/tracking", icon: Truck },
-  { title: "Gestor de Leads", url: "/leads", icon: Users },
+  { title: "CRM", url: "/crm", icon: UserCheck },
+  { title: "Validador de Clientes", url: "/validation", icon: Shield, locked: true, comingSoonNote: "Validación con IA en pruebas." },
+  { title: "Shopify Analytics", url: "/shopify", icon: ShoppingBag, locked: true, comingSoonNote: "Analytics nativo Shopify en beta privada." },
+  { title: "Dropi", url: "/dropi", icon: Box, locked: true, comingSoonNote: "Conexión directa con Dropi en beta privada." },
+  { title: "Studio IA", url: "/studio-ia", icon: Sparkles, locked: true, comingSoonNote: "Studio IA: imagen, copy y logo en beta." },
+  { title: "Chat en Vivo", url: "/chat", icon: MessageSquare, locked: true, comingSoonNote: "Chat omnicanal en beta privada." },
+  { title: "Validación Pedidos", url: "/order-validation", icon: CheckCircle, locked: true, comingSoonNote: "Validación automática de pedidos en pruebas." },
+  { title: "Seguimiento", url: "/tracking", icon: Truck, locked: true, comingSoonNote: "Tracking unificado de transportadoras en construcción." },
+  { title: "Gestor de Leads", url: "/leads", icon: Users, locked: true, comingSoonNote: "Pipeline de leads con scoring en construcción." },
   { title: "Configuración", url: "/settings", icon: Settings },
 ];
 
@@ -455,17 +465,36 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
               <SidebarMenu>
                 {navigationItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive(item.url)}
-                      tooltip={item.title}
-                      className="text-base"
-                    >
-                      <NavLink to={item.url}>
+                    {item.locked ? (
+                      <SidebarMenuButton
+                        tooltip={`${item.title} — Próximamente`}
+                        className="text-base opacity-60 cursor-not-allowed hover:bg-sidebar-accent/40"
+                        onClick={() =>
+                          toast(`${item.title} — Próximamente`, {
+                            description:
+                              item.comingSoonNote ?? "Esta herramienta llega en la próxima release.",
+                          })
+                        }
+                      >
                         <item.icon className="size-4" />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
+                        <span className="flex-1 truncate">{item.title}</span>
+                        <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-amber-500/90 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
+                          <Lock className="size-3" /> Pronto
+                        </span>
+                      </SidebarMenuButton>
+                    ) : (
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.url)}
+                        tooltip={item.title}
+                        className="text-base"
+                      >
+                        <NavLink to={item.url}>
+                          <item.icon className="size-4" />
+                          <span>{item.title}</span>
+                        </NavLink>
+                      </SidebarMenuButton>
+                    )}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

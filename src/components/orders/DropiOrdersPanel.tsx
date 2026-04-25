@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -11,9 +12,13 @@ import { parseDropiXlsxArrayBuffer, toSupabaseInsertRows } from "@/lib/dropiImpo
 import {
   aggregateOrdersByRegion,
   attributedMetaSpend,
+  carrierKey,
   computeDailyProfitTrend,
   computeDropiMetrics,
+  computeMetricsByCarrier,
+  computeMetricsByRegion,
   computeTopProductInsight,
+  detectDateRange,
   filterDropiOrders,
   formatRoas,
   regionKey,
@@ -31,6 +36,7 @@ import {
   Package,
   Megaphone,
   Scale,
+  Truck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -108,14 +114,25 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [{ from: dateFrom, to: dateTo }, setRange] = useState(defaultRange);
   const [region, setRegion] = useState("all");
   const [product, setProduct] = useState("all");
+  const [carrier, setCarrier] = useState("all");
   const [metaInput, setMetaInput] = useState("");
   const [orders, setOrders] = useState<DropiOrderRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [chartPeriodDays, setChartPeriodDays] = useState<1 | 7 | 14 | 30>(30);
   const [vizRegion, setVizRegion] = useState<string | null>(null);
+  const [showRegionGrid, setShowRegionGrid] = useState(true);
+  const [postImport, setPostImport] = useState<{
+    open: boolean;
+    detectedFrom: string;
+    detectedTo: string;
+    rangeFrom: string;
+    rangeTo: string;
+    metaInput: string;
+    rowsImported: number;
+  } | null>(null);
 
-  const filters: DropiMetricsFilters = useMemo(() => ({ region, product }), [region, product]);
+  const filters: DropiMetricsFilters = useMemo(() => ({ region, product, carrier }), [region, product, carrier]);
 
   const chartBounds = useMemo(() => {
     const today = new Date();
@@ -212,14 +229,20 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     return ["all", ...[...set].sort((a, b) => a.localeCompare(b, "es"))];
   }, [ordersInMainRange]);
 
+  const carrierOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const o of ordersInMainRange) set.add(carrierKey(o));
+    return ["all", ...[...set].sort((a, b) => a.localeCompare(b, "es"))];
+  }, [ordersInMainRange]);
+
   const filteredForMetrics = useMemo(
     () => filterDropiOrders(ordersInMainRange, filters),
     [ordersInMainRange, filters],
   );
 
   const ordersChartProductOnly = useMemo(
-    () => filterDropiOrders(ordersForChartWindow, { region: "all", product }),
-    [ordersForChartWindow, product],
+    () => filterDropiOrders(ordersForChartWindow, { region: "all", product, carrier }),
+    [ordersForChartWindow, product, carrier],
   );
 
   const profitTrend = useMemo(
@@ -260,6 +283,16 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     return computeTopProductInsight(ordersInMainRange, filters, label, metaSpend);
   }, [ordersInMainRange, filters, metaSpend, metrics.topProducto?.label]);
 
+  const regionBreakdown = useMemo(() => {
+    const base = filterDropiOrders(ordersInMainRange, { region: "all", product, carrier });
+    return computeMetricsByRegion(base, metaSpend);
+  }, [ordersInMainRange, product, carrier, metaSpend]);
+
+  const carrierBreakdown = useMemo(() => {
+    const base = filterDropiOrders(ordersInMainRange, { region, product, carrier: "all" });
+    return computeMetricsByCarrier(base, metaSpend);
+  }, [ordersInMainRange, region, product, metaSpend]);
+
   const saveMetaSpend = async () => {
     if (!userId) return;
     try {
@@ -296,6 +329,12 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         return;
       }
 
+      const detected = detectDateRange(parsed.map((p) => p.order_date));
+      if (!detected) {
+        toast.error("No pudimos detectar fechas válidas en el archivo");
+        return;
+      }
+
       const { data: imp, error: impErr } = await supabase
         .from("dropi_order_imports")
         .insert({
@@ -318,13 +357,62 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         if (upErr) throw upErr;
       }
 
-      toast.success(`Importadas ${parsed.length} filas. Los IDs Dropi se actualizan si ya existían.`);
-      await loadOrders();
+      const metaSnapshot = await supabase
+        .from("dropi_meta_spend_snapshots")
+        .select("meta_ad_spend")
+        .eq("user_id", userId)
+        .eq("period_start", detected.from)
+        .eq("period_end", detected.to)
+        .maybeSingle();
+      const existingMeta = (metaSnapshot.data ?? null) as { meta_ad_spend: number | null } | null;
+
+      setPostImport({
+        open: true,
+        detectedFrom: detected.from,
+        detectedTo: detected.to,
+        rangeFrom: detected.from,
+        rangeTo: detected.to,
+        metaInput: existingMeta?.meta_ad_spend != null ? String(existingMeta.meta_ad_spend) : "",
+        rowsImported: parsed.length,
+      });
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Error importando");
     } finally {
       setImporting(false);
+    }
+  };
+
+  const confirmPostImport = async () => {
+    if (!postImport || !userId) return;
+    const { rangeFrom, rangeTo, metaInput: pmInput, rowsImported } = postImport;
+    if (!rangeFrom || !rangeTo || rangeFrom > rangeTo) {
+      toast.error("Rango de fechas inválido");
+      return;
+    }
+    const metaValue = Number(String(pmInput).replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(metaValue) || metaValue < 0) {
+      toast.error("Indica el gasto en Meta para este rango (0 si no invertiste)");
+      return;
+    }
+    try {
+      const { error } = await supabase.from("dropi_meta_spend_snapshots").upsert(
+        {
+          user_id: userId,
+          period_start: rangeFrom,
+          period_end: rangeTo,
+          meta_ad_spend: metaValue,
+        },
+        { onConflict: "user_id,period_start,period_end" },
+      );
+      if (error) throw error;
+      setRange({ from: rangeFrom, to: rangeTo });
+      setMetaInput(String(metaValue));
+      setPostImport(null);
+      toast.success(`Importadas ${rowsImported} filas y gasto Meta guardado para ${rangeFrom} → ${rangeTo}`);
+      await loadOrders();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error guardando gasto Meta");
     }
   };
 
@@ -392,6 +480,20 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
               {productOptions.map((p) => (
                 <option key={p} value={p}>
                   {p === "all" ? "Todos los productos" : p}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Logística (transportadora)</label>
+            <select
+              value={carrier}
+              onChange={(e) => setCarrier(e.target.value)}
+              className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm min-w-[200px]"
+            >
+              {carrierOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c === "all" ? "Todas las logísticas" : c}
                 </option>
               ))}
             </select>
@@ -765,6 +867,209 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         </CardContent>
       </Card>
 
+      <Card className="bg-gray-900/50 border-gray-700">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <CardTitle className="text-white flex items-center gap-2">
+            <Truck className="w-5 h-5" /> Logística (transportadora)
+          </CardTitle>
+          {carrier !== "all" && (
+            <Button size="sm" variant="ghost" className="text-gray-400" onClick={() => setCarrier("all")}>
+              Quitar filtro
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          {carrierBreakdown.length === 0 ? (
+            <p className="text-gray-500 text-sm">Sin pedidos en este rango / filtros.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {carrierBreakdown.map((row) => {
+                const totalRow = row.metrics.totalPedidos;
+                const pctRow = (n: number) => (totalRow > 0 ? `${Math.round((n / totalRow) * 100)}%` : "0%");
+                const isActive = carrier === row.carrier;
+                return (
+                  <button
+                    key={row.carrier}
+                    type="button"
+                    onClick={() => setCarrier(isActive ? "all" : row.carrier)}
+                    className={`text-left rounded-xl border p-4 transition-colors ${
+                      isActive
+                        ? "border-emerald-500/60 bg-emerald-500/10"
+                        : "border-gray-700 bg-gray-800/40 hover:bg-gray-800/70"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2 text-white font-semibold">
+                        <Truck className="w-4 h-4 text-emerald-400" />
+                        {row.carrier}
+                      </div>
+                      <Badge variant="secondary" className="bg-gray-700 text-gray-200">
+                        {row.metrics.totalPedidos} pedidos
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-300">
+                      <div>
+                        <div className="text-gray-500">Entregados</div>
+                        <div className="text-emerald-400 font-semibold">
+                          {row.metrics.counts.entregados} ({pctRow(row.metrics.counts.entregados)})
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">En tránsito</div>
+                        <div className="text-blue-300 font-semibold">
+                          {row.metrics.counts.confirmados} ({pctRow(row.metrics.counts.confirmados)})
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Devolución</div>
+                        <div className="text-orange-300 font-semibold">
+                          {row.metrics.counts.enDevolucion} ({pctRow(row.metrics.counts.enDevolucion)})
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Cancelados</div>
+                        <div className="text-red-300 font-semibold">
+                          {row.metrics.counts.cancelados} ({pctRow(row.metrics.counts.cancelados)})
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">Ganancia real</div>
+                        <div className="text-white font-semibold">{formatMoney(row.metrics.gananciaReal)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500">ROAS real</div>
+                        <div className="text-white font-semibold">{formatRoas(row.metrics.roasReal)}</div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <p className="text-xs text-gray-500 mt-3">
+            Clic en una tarjeta para filtrar todo el panel por esa logística. Meta se reparte por volumen de pedidos.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-gray-900/50 border-gray-700">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <CardTitle className="text-white flex items-center gap-2">
+            <MapPin className="w-5 h-5" /> Resumen automático por región
+          </CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowRegionGrid((v) => !v)}
+          >
+            {showRegionGrid ? "Ocultar" : "Mostrar"}
+          </Button>
+        </CardHeader>
+        {showRegionGrid && (
+          <CardContent>
+            {regionBreakdown.length === 0 ? (
+              <p className="text-gray-500 text-sm">Sin pedidos en este rango / filtros.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {regionBreakdown.map((row) => {
+                  const totalRow = row.metrics.totalPedidos;
+                  const pctRow = (n: number) => (totalRow > 0 ? `${Math.round((n / totalRow) * 100)}%` : "0%");
+                  const isActive = region === row.region;
+                  return (
+                    <div
+                      key={row.region}
+                      className={`rounded-xl border p-4 transition-colors ${
+                        isActive ? "border-emerald-500/60 bg-emerald-500/10" : "border-gray-700 bg-gray-800/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-white font-semibold">
+                          <MapPin className="w-4 h-4 text-emerald-400" />
+                          {row.region}
+                        </div>
+                        <Badge variant="secondary" className="bg-gray-700 text-gray-200">
+                          {row.metrics.totalPedidos} pedidos
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-300 mb-3">
+                        <div>
+                          <div className="text-gray-500">Entregados</div>
+                          <div className="text-emerald-400 font-semibold">
+                            {row.metrics.counts.entregados} ({pctRow(row.metrics.counts.entregados)})
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">En tránsito</div>
+                          <div className="text-blue-300 font-semibold">
+                            {row.metrics.counts.confirmados} ({pctRow(row.metrics.counts.confirmados)})
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Pendientes</div>
+                          <div className="text-yellow-300 font-semibold">
+                            {row.metrics.counts.pendientes} ({pctRow(row.metrics.counts.pendientes)})
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Novedades</div>
+                          <div className="text-amber-300 font-semibold">
+                            {row.metrics.counts.novedades} ({pctRow(row.metrics.counts.novedades)})
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Devolución</div>
+                          <div className="text-orange-300 font-semibold">
+                            {row.metrics.counts.enDevolucion} ({pctRow(row.metrics.counts.enDevolucion)})
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Cancelados</div>
+                          <div className="text-red-300 font-semibold">
+                            {row.metrics.counts.cancelados} ({pctRow(row.metrics.counts.cancelados)})
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 border-t border-gray-700 pt-3">
+                        <div>
+                          <div className="text-gray-500">Total vendido</div>
+                          <div className="text-white font-semibold">{formatMoney(row.metrics.totalVendido)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">Ganancia real</div>
+                          <div className="text-emerald-300 font-semibold">{formatMoney(row.metrics.gananciaReal)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">ROAS real</div>
+                          <div className="text-white font-semibold">{formatRoas(row.metrics.roasReal)}</div>
+                        </div>
+                        <div>
+                          <div className="text-gray-500">CPA</div>
+                          <div className="text-white font-semibold">
+                            {row.metrics.cpa != null ? formatMoney(row.metrics.cpa) : "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => setRegion(isActive ? "all" : row.region)}
+                      >
+                        {isActive ? "Quitar filtro" : "Ver solo esta región"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-3">
+              Cada tarjeta usa el rango principal y los filtros activos de producto y logística. Meta se reparte
+              proporcionalmente al volumen de cada región.
+            </p>
+          </CardContent>
+        )}
+      </Card>
+
       {topProductInsight && (
         <Card className="bg-gray-900/50 border-gray-700">
           <CardHeader>
@@ -842,8 +1147,12 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       )}
 
       <Card className="bg-gray-900/50 border-gray-700">
-        <CardHeader>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <CardTitle className="text-white">Pedidos ({filteredForMetrics.length} con filtros)</CardTitle>
+          <div className="text-xs text-gray-400">
+            CPA general: <span className="text-white font-semibold">{metrics.cpa != null ? formatMoney(metrics.cpa) : "—"}</span>
+            {metrics.cpa == null && <span className="ml-1 text-gray-500">(añade gasto Meta + entregados)</span>}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -853,38 +1162,216 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
           ) : filteredForMetrics.length === 0 ? (
             <p className="text-gray-400 py-8 text-center">No hay pedidos en este rango. Importa un .xlsx de Dropi.</p>
           ) : (
-            <ScrollArea className="h-[480px]">
+            <ScrollArea className="h-[560px]">
               <div className="space-y-3 pr-3">
-                {filteredForMetrics.map((o) => (
-                  <Card key={o.id} className="bg-gray-800/50 border-gray-700">
-                    <CardContent className="p-4 flex flex-wrap justify-between gap-2">
-                      <div>
-                        <div className="text-white font-semibold">
-                          #{o.dropi_numeric_id}{" "}
-                          {o.shop_order_number ? `· Tienda ${o.shop_order_number}` : ""}
+                {filteredForMetrics.map((o) => {
+                  const sale = o.product_sale_amount ?? 0;
+                  const profit = o.profit ?? 0;
+                  const ship = o.shipping_price ?? 0;
+                  const cpaGeneral = metrics.cpa ?? 0;
+                  const gananciaAprox = profit - cpaGeneral;
+                  const margenPct = sale > 0 ? Math.round((gananciaAprox / sale) * 1000) / 10 : 0;
+                  return (
+                    <Card key={o.id} className="bg-gray-800/50 border-gray-700">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2">
+                            <Badge className={`border ${bucketBadgeClass(o.status_bucket)} flex-shrink-0`}>
+                              {BUCKET_LABEL[o.status_bucket] ?? o.status_bucket}
+                            </Badge>
+                            <div>
+                              <div className="text-white font-semibold">
+                                #{o.dropi_numeric_id}
+                                {o.shop_order_number ? ` · Tienda ${o.shop_order_number}` : ""}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {o.order_date}
+                                {o.order_time ? ` · ${o.order_time}` : ""}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-emerald-400 font-bold text-lg">{formatMoney(sale)}</div>
+                            <div className="text-[10px] uppercase tracking-wide text-gray-500">Total venta</div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-400">
-                          {o.customer_name ?? "—"} · {o.order_date}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm bg-gray-800/40 border border-gray-700 rounded-lg p-3">
+                          <div className="text-gray-300">
+                            <span className="text-gray-500">Cliente:</span>{" "}
+                            <span className="text-white font-medium">{o.customer_name ?? "—"}</span>
+                          </div>
+                          <div className="text-gray-300">
+                            <span className="text-gray-500">Tel:</span>{" "}
+                            <span className="text-white font-medium">{o.customer_phone ?? "—"}</span>
+                          </div>
+                          <div className="text-gray-300">
+                            <span className="text-gray-500">Transp.:</span>{" "}
+                            <span className="text-white font-medium">{carrierKey(o)}</span>
+                          </div>
+                          <div className="text-gray-300">
+                            <span className="text-gray-500">Región:</span>{" "}
+                            <span className="text-white font-medium">{regionKey(o)}</span>
+                          </div>
+                          <div className="text-gray-300">
+                            <span className="text-gray-500">Producto:</span>{" "}
+                            <span className="text-white font-medium">{(o.categories ?? "").trim() || "Sin categoría"}</span>
+                          </div>
+                          <div className="text-gray-300">
+                            <span className="text-gray-500">Guía:</span>{" "}
+                            <span className="text-white font-medium">{o.guide_number ?? "—"}</span>
+                          </div>
+                          <div className="text-gray-300 md:col-span-2">
+                            <span className="text-gray-500">Dirección:</span>{" "}
+                            <span className="text-white font-medium">{o.address ?? "—"}</span>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {[o.department, o.city].filter(Boolean).join(" · ")}
+
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
+                            <div className="text-[10px] uppercase tracking-wide text-emerald-300/80">Venta</div>
+                            <div className="text-emerald-300 font-bold">{formatMoney(sale)}</div>
+                          </div>
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
+                            <div className="text-[10px] uppercase tracking-wide text-amber-300/80">CPA general</div>
+                            <div className="text-amber-300 font-bold">
+                              {metrics.cpa != null ? formatMoney(cpaGeneral) : "—"}
+                            </div>
+                          </div>
+                          <div
+                            className={`rounded-lg border p-2 ${
+                              gananciaAprox >= 0
+                                ? "border-blue-500/30 bg-blue-500/10"
+                                : "border-red-500/30 bg-red-500/10"
+                            }`}
+                          >
+                            <div
+                              className={`text-[10px] uppercase tracking-wide ${
+                                gananciaAprox >= 0 ? "text-blue-300/80" : "text-red-300/80"
+                              }`}
+                            >
+                              Ganancia aprox.
+                            </div>
+                            <div className={`font-bold ${gananciaAprox >= 0 ? "text-blue-300" : "text-red-300"}`}>
+                              {formatMoney(gananciaAprox)}
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-2">
+                            <div className="text-[10px] uppercase tracking-wide text-gray-400">Envío</div>
+                            <div className="text-white font-bold">{formatMoney(ship)}</div>
+                          </div>
+                          <div
+                            className={`rounded-lg border p-2 ${
+                              margenPct >= 0
+                                ? "border-orange-500/30 bg-orange-500/10"
+                                : "border-red-500/30 bg-red-500/10"
+                            }`}
+                          >
+                            <div
+                              className={`text-[10px] uppercase tracking-wide ${
+                                margenPct >= 0 ? "text-orange-300/80" : "text-red-300/80"
+                              }`}
+                            >
+                              Margen
+                            </div>
+                            <div className={`font-bold ${margenPct >= 0 ? "text-orange-300" : "text-red-300"}`}>
+                              {sale > 0 ? `${margenPct}%` : "—"}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right space-y-1">
-                        <div className="text-white font-medium">{formatMoney(o.product_sale_amount ?? 0)}</div>
-                        <div className="text-xs text-gray-400">Ganancia: {formatMoney(o.profit ?? 0)}</div>
-                        <Badge className={`border ${bucketBadgeClass(o.status_bucket)}`}>
-                          {BUCKET_LABEL[o.status_bucket] ?? o.status_bucket}
-                        </Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </ScrollArea>
           )}
+          <p className="text-[11px] text-gray-500 mt-3">
+            <span className="text-gray-300 font-semibold">CPA general</span> = inversión Meta del rango / pedidos
+            entregados. Es el coste publicitario que carga cada entrega.{" "}
+            <span className="text-gray-300 font-semibold">Ganancia aprox.</span> = ganancia del pedido − CPA general.
+            <span className="text-gray-300 font-semibold"> Margen</span> = ganancia aprox. / venta.
+          </p>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={!!postImport?.open}
+        onOpenChange={(o) => {
+          if (!o) setPostImport(null);
+        }}
+      >
+        <DialogContent className="bg-gray-900 border-gray-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Megaphone className="w-5 h-5 text-emerald-400" />
+              Confirma rango y gasto en Meta
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Detectamos las fechas del archivo. Ajusta si quieres y registra el gasto en Meta de ese mismo periodo:
+              ROAS, CPA y precio sugerido se calculan con esos datos.
+            </DialogDescription>
+          </DialogHeader>
+          {postImport && (
+            <div className="space-y-4 mt-2">
+              <div className="text-xs text-gray-400">
+                Detectado en el Excel: <span className="text-gray-200">{postImport.detectedFrom}</span> →{" "}
+                <span className="text-gray-200">{postImport.detectedTo}</span> · {postImport.rowsImported} filas
+                importadas.
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Fecha de inicio</label>
+                  <Input
+                    type="date"
+                    value={postImport.rangeFrom}
+                    onChange={(e) =>
+                      setPostImport((p) => (p ? { ...p, rangeFrom: e.target.value } : p))
+                    }
+                    className="bg-gray-800 border-gray-600 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Fecha de término</label>
+                  <Input
+                    type="date"
+                    value={postImport.rangeTo}
+                    onChange={(e) =>
+                      setPostImport((p) => (p ? { ...p, rangeTo: e.target.value } : p))
+                    }
+                    className="bg-gray-800 border-gray-600 text-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Gasto en Meta para este rango (CLP) <span className="text-red-400">*</span>
+                </label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Ej: 270000"
+                  value={postImport.metaInput}
+                  onChange={(e) =>
+                    setPostImport((p) => (p ? { ...p, metaInput: e.target.value } : p))
+                  }
+                  className="bg-gray-800 border-gray-600 text-white"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Si no invertiste en Meta este periodo escribe 0. Es obligatorio para que el panel calcule ROAS, CPA y
+                  precio sugerido.
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setPostImport(null)}>
+              Recordar después
+            </Button>
+            <Button onClick={() => void confirmPostImport()}>Guardar gasto Meta</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

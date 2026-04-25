@@ -6,6 +6,7 @@ export type DropiOrderForMetrics = {
   department: string | null;
   city: string | null;
   categories: string | null;
+  carrier: string | null;
   product_sale_amount: number | null;
   profit: number | null;
   invoiced_amount: number | null;
@@ -19,6 +20,7 @@ export type DropiOrderForMetrics = {
 export type DropiMetricsFilters = {
   region: string;
   product: string;
+  carrier: string;
 };
 
 const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
@@ -56,6 +58,15 @@ function matchesProduct(o: DropiOrderForMetrics, product: string): boolean {
   return c === product;
 }
 
+export function carrierKey(o: DropiOrderForMetrics): string {
+  return (o.carrier ?? "").trim() || "Sin transportadora";
+}
+
+function matchesCarrier(o: DropiOrderForMetrics, carrier: string): boolean {
+  if (carrier === "all") return true;
+  return carrierKey(o) === carrier;
+}
+
 function variableCost(o: DropiOrderForMetrics): number {
   return (
     (o.supplier_total ?? 0) +
@@ -65,8 +76,10 @@ function variableCost(o: DropiOrderForMetrics): number {
   );
 }
 
-export function filterDropiOrders(orders: DropiOrderForMetrics[], f: DropiMetricsFilters): DropiOrderForMetrics[] {
-  return orders.filter((o) => matchesRegion(o, f.region) && matchesProduct(o, f.product));
+export function filterDropiOrders<T extends DropiOrderForMetrics>(orders: T[], f: DropiMetricsFilters): T[] {
+  return orders.filter(
+    (o) => matchesRegion(o, f.region) && matchesProduct(o, f.product) && matchesCarrier(o, f.carrier),
+  );
 }
 
 export type DropiDashboardMetrics = {
@@ -226,7 +239,11 @@ export function computeTopProductInsight(
   topLabel: string,
   metaSpend: number,
 ): TopProductInsight | null {
-  const forAttribution = filterDropiOrders(allOrdersInRange, { region: "all", product: filters.product });
+  const forAttribution = filterDropiOrders(allOrdersInRange, {
+    region: "all",
+    product: filters.product,
+    carrier: filters.carrier,
+  });
   const slice = forAttribution.filter((o) => ((o.categories ?? "").trim() || "Sin categoría") === topLabel);
   if (!slice.length) return null;
 
@@ -333,6 +350,92 @@ export function aggregateOrdersByRegion(orders: DropiOrderForMetrics[]): RegionO
 export function attributedMetaSpend(metaSpend: number, sliceCount: number, baseCount: number): number {
   if (baseCount <= 0 || sliceCount <= 0) return 0;
   return metaSpend * (sliceCount / baseCount);
+}
+
+export type CarrierOrderCount = { carrier: string; count: number };
+
+export function aggregateOrdersByCarrier(orders: DropiOrderForMetrics[]): CarrierOrderCount[] {
+  const m = new Map<string, number>();
+  for (const o of orders) {
+    const k = carrierKey(o);
+    m.set(k, (m.get(k) ?? 0) + 1);
+  }
+  return [...m.entries()]
+    .map(([carrier, count]) => ({ carrier, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+export type RegionBreakdownRow = {
+  region: string;
+  metrics: DropiDashboardMetrics;
+  metaAttributed: number;
+};
+
+/**
+ * Devuelve métricas completas (cantidades, %, KPIs económicos) para cada región
+ * presente en el dataset, ordenadas por volumen de pedidos. La inversión Meta se
+ * reparte proporcionalmente al peso de la región sobre el total filtrado.
+ */
+export function computeMetricsByRegion(
+  orders: DropiOrderForMetrics[],
+  metaSpend: number,
+): RegionBreakdownRow[] {
+  if (orders.length === 0) return [];
+  const buckets = new Map<string, DropiOrderForMetrics[]>();
+  for (const o of orders) {
+    const k = regionKey(o);
+    const arr = buckets.get(k) ?? [];
+    arr.push(o);
+    buckets.set(k, arr);
+  }
+  const rows: RegionBreakdownRow[] = [];
+  for (const [region, slice] of buckets) {
+    const meta = attributedMetaSpend(metaSpend, slice.length, orders.length);
+    rows.push({ region, metrics: computeDropiMetrics(slice, meta), metaAttributed: meta });
+  }
+  rows.sort((a, b) => b.metrics.totalPedidos - a.metrics.totalPedidos);
+  return rows;
+}
+
+export type CarrierBreakdownRow = {
+  carrier: string;
+  metrics: DropiDashboardMetrics;
+  metaAttributed: number;
+};
+
+export function computeMetricsByCarrier(
+  orders: DropiOrderForMetrics[],
+  metaSpend: number,
+): CarrierBreakdownRow[] {
+  if (orders.length === 0) return [];
+  const buckets = new Map<string, DropiOrderForMetrics[]>();
+  for (const o of orders) {
+    const k = carrierKey(o);
+    const arr = buckets.get(k) ?? [];
+    arr.push(o);
+    buckets.set(k, arr);
+  }
+  const rows: CarrierBreakdownRow[] = [];
+  for (const [carrier, slice] of buckets) {
+    const meta = attributedMetaSpend(metaSpend, slice.length, orders.length);
+    rows.push({ carrier, metrics: computeDropiMetrics(slice, meta), metaAttributed: meta });
+  }
+  rows.sort((a, b) => b.metrics.totalPedidos - a.metrics.totalPedidos);
+  return rows;
+}
+
+/** Detecta el rango (min/max order_date) de una colección de pedidos parseados. */
+export function detectDateRange(orderDates: Array<string | null | undefined>): { from: string; to: string } | null {
+  let min: string | null = null;
+  let max: string | null = null;
+  for (const d of orderDates) {
+    if (!d) continue;
+    const s = d.slice(0, 10);
+    if (min == null || s < min) min = s;
+    if (max == null || s > max) max = s;
+  }
+  if (!min || !max) return null;
+  return { from: min, to: max };
 }
 
 export function formatRoas(n: number | null): string {

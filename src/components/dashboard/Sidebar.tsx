@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { 
+import {
   BarChart3,
   Shield,
   ShoppingBag,
@@ -19,24 +19,34 @@ import {
   Truck,
   UserCheck,
   Sparkles,
-  Command
+  Command,
+  Lock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
 // import { useSimpleCommandPalette } from "../../hooks/useSimpleCommandPalette";
 import { supabase } from "../../integrations/supabase/client";
 
-const navigationItems = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof BarChart3;
+  locked?: boolean;
+  comingSoonNote?: string;
+};
+
+const navigationItems: NavItem[] = [
   { title: "Dashboard", url: "/dashboard", icon: BarChart3 },
-  { title: "Validador de Clientes", url: "/validation", icon: Shield },
-  { title: "CRM", url: "/crm", icon: UserCheck },
   { title: "Gestión de Pedidos", url: "/orders", icon: Package },
-  { title: "Shopify Analytics", url: "/shopify", icon: ShoppingBag },
-  { title: "Studio IA", url: "/studio-ia", icon: Sparkles },
-  { title: "Chat en Vivo", url: "/chat", icon: MessageSquare },
-  { title: "Validación Pedidos", url: "/order-validation", icon: CheckCircle },
-  { title: "Seguimiento", url: "/tracking", icon: Truck },
-  { title: "Gestor de Leads", url: "/leads", icon: Users },
+  { title: "CRM", url: "/crm", icon: UserCheck },
+  { title: "Validador de Clientes", url: "/validation", icon: Shield, locked: true, comingSoonNote: "Validación con IA en pruebas." },
+  { title: "Shopify Analytics", url: "/shopify", icon: ShoppingBag, locked: true, comingSoonNote: "Analytics nativo Shopify en beta privada." },
+  { title: "Studio IA", url: "/studio-ia", icon: Sparkles, locked: true, comingSoonNote: "Studio IA: imagen, copy y logo en beta." },
+  { title: "Chat en Vivo", url: "/chat", icon: MessageSquare, locked: true, comingSoonNote: "Chat omnicanal en beta privada." },
+  { title: "Validación Pedidos", url: "/order-validation", icon: CheckCircle, locked: true, comingSoonNote: "Validación automática de pedidos en pruebas." },
+  { title: "Seguimiento", url: "/tracking", icon: Truck, locked: true, comingSoonNote: "Tracking unificado de transportadoras en construcción." },
+  { title: "Gestor de Leads", url: "/leads", icon: Users, locked: true, comingSoonNote: "Pipeline de leads con scoring en construcción." },
   { title: "Configuración", url: "/settings", icon: Settings },
 ];
 
@@ -147,7 +157,40 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <nav className={cn("space-y-1", collapsed ? "p-2" : "p-4")}>
         {navigationItems.map((item) => {
           const active = isActive(item.url);
-          
+
+          if (item.locked) {
+            return (
+              <button
+                key={item.title}
+                type="button"
+                onClick={() =>
+                  toast(`${item.title} — Próximamente`, {
+                    description: item.comingSoonNote ?? "Esta herramienta llega en la próxima release.",
+                  })
+                }
+                className={cn(
+                  "relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                  "hover:bg-sidebar-accent text-sidebar-foreground/70 cursor-not-allowed",
+                  collapsed && "justify-center px-2"
+                )}
+                title={collapsed ? `${item.title} — Próximamente` : undefined}
+              >
+                <item.icon className="w-5 h-5 transition-colors flex-shrink-0 text-sidebar-foreground/70" />
+                {!collapsed && (
+                  <span className="font-medium flex-1 truncate">{item.title}</span>
+                )}
+                {!collapsed && (
+                  <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-amber-500/90 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
+                    <Lock className="w-3 h-3" /> Pronto
+                  </span>
+                )}
+                {collapsed && (
+                  <Lock className="w-3 h-3 absolute right-2 top-2 text-amber-500" />
+                )}
+              </button>
+            );
+          }
+
           return (
             <NavLink
               key={item.title}
@@ -155,8 +198,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
                 "hover:bg-sidebar-accent",
-                active 
-                  ? "bg-sidebar-active text-sidebar-active-foreground shadow-sm" 
+                active
+                  ? "bg-sidebar-active text-sidebar-active-foreground shadow-sm"
                   : "text-sidebar-foreground",
                 collapsed && "justify-center px-2"
               )}
@@ -166,7 +209,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 "w-5 h-5 transition-colors flex-shrink-0",
                 active ? "text-primary" : "text-sidebar-foreground group-hover:text-primary"
               )} />
-              
+
               {!collapsed && (
                 <span className={cn(
                   "font-medium transition-colors",
