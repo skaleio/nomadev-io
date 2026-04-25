@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { parseDropiXlsxArrayBuffer, toSupabaseInsertRows } from "@/lib/dropiImport";
@@ -123,6 +124,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [orders, setOrders] = useState<DropiOrderRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importStage, setImportStage] = useState<string | null>(null);
   const [chartPeriodDays, setChartPeriodDays] = useState<1 | 7 | 14 | 30>(30);
   const [vizRegion, setVizRegion] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -355,14 +357,22 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       return;
     }
     setImporting(true);
+    setImportStage("Preparando importación…");
     try {
+      // Deja que React pinte la barra antes de trabajo pesado (parse/insert)
+      await new Promise((r) => setTimeout(r, 50));
+
+      setImportStage("Leyendo archivo…");
       const buf = await file.arrayBuffer();
+
+      setImportStage("Procesando datos…");
       const parsed = parseDropiXlsxArrayBuffer(buf);
       if (!parsed.length) { toast.error("No se encontraron filas válidas (revisa ID y FECHA)"); return; }
 
       const detected = detectDateRange(parsed.map((p) => p.order_date));
       if (!detected) { toast.error("No pudimos detectar fechas válidas en el archivo"); return; }
 
+      setImportStage("Subiendo datos…");
       const { data: imp, error: impErr } = await supabase
         .from("dropi_order_imports")
         .insert({ user_id: userId, source_filename: file.name, row_count: parsed.length })
@@ -373,12 +383,14 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
       const rows = toSupabaseInsertRows(userId, imp.id, parsed);
       for (let i = 0; i < rows.length; i += 120) {
+        if (i === 0) setImportStage("Guardando pedidos…");
         const { error: upErr } = await supabase.from("dropi_orders").upsert(rows.slice(i, i + 120), {
           onConflict: "user_id,dropi_numeric_id",
         });
         if (upErr) throw upErr;
       }
 
+      setImportStage("Preparando resumen…");
       const metaSnapshot = await supabase
         .from("dropi_meta_spend_snapshots")
         .select("meta_ad_spend")
@@ -402,6 +414,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       toast.error(err instanceof Error ? err.message : "Error importando");
     } finally {
       setImporting(false);
+      setImportStage(null);
     }
   };
 
@@ -460,6 +473,25 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
   return (
     <div className="space-y-6">
+      {importing && (
+        <div className="sticky top-16 z-20">
+          <div className="rounded-2xl border border-border/50 bg-card/90 p-3 shadow-elev-2 backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-medium text-foreground/90">{importStage ?? "Importando datos…"}</p>
+              <Badge variant="soft" className="tabular-nums">En progreso</Badge>
+            </div>
+            <div className="mt-2">
+              {/* Indeterminado: valor ~60 + shimmer */}
+              <div className="relative">
+                <Progress value={60} className="h-2 bg-muted/60" />
+                <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+                  <div className="h-full w-1/2 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent animate-shimmer" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── Importar ── */}
       <Card>
         <CardHeader>

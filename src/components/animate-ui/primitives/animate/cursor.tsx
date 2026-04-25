@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import {
   motion,
   useMotionValue,
@@ -198,7 +199,7 @@ function Cursor({ ref, asChild = false, style, ...props }: CursorProps) {
 
   const Component = asChild ? Slot : motion.div;
 
-  return (
+  const node = (
     <AnimatePresence>
       {active && (
         <Component
@@ -223,6 +224,15 @@ function Cursor({ ref, asChild = false, style, ...props }: CursorProps) {
       )}
     </AnimatePresence>
   );
+
+  // Importante: los Dialogs se renderizan en portal (body). Si el cursor global vive
+  // dentro de #root (que puede ser un stacking context), puede quedar "por detrás".
+  // Portaleamos el cursor global a body para asegurar que quede arriba.
+  if (global && typeof document !== 'undefined') {
+    return createPortal(node, document.body);
+  }
+
+  return node;
 }
 
 type CursorFollowSide = 'top' | 'right' | 'bottom' | 'left';
