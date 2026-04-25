@@ -20,8 +20,12 @@ interface WebSocketProviderProps {
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
-  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-  
+  // Solo conectamos si el usuario está autenticado y hay una URL explícita configurada.
+  // Si VITE_WS_URL no está definido, el WS queda deshabilitado (evita el spam de errores
+  // contra ws://localhost:3001 cuando no hay backend corriendo).
+  const envWsUrl = (import.meta.env.VITE_WS_URL as string | undefined)?.trim();
+  const wsUrl = isAuthenticated && envWsUrl ? envWsUrl : null;
+
   const {
     isConnected,
     error,
@@ -31,22 +35,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     leaveConversation,
     sendTypingStart: wsSendTypingStart,
     sendTypingStop: wsSendTypingStop,
-  } = useWebSocket(wsUrl, {
-    onMessage: (message) => {
-      console.log('Mensaje WebSocket recibido:', message);
-      // Aquí puedes manejar diferentes tipos de mensajes
-      // Por ejemplo, actualizar el estado de conversaciones, etc.
-    },
-    onError: (error) => {
-      console.error('Error WebSocket:', error);
-    },
-    onOpen: () => {
-      console.log('WebSocket conectado');
-    },
-    onClose: () => {
-      console.log('WebSocket desconectado');
-    },
-  });
+  } = useWebSocket(wsUrl);
 
   // Unirse a la sala del usuario cuando se autentica
   useEffect(() => {

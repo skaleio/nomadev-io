@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuthRedirect } from '../hooks/useAuthRedirect';
 import { useOnboardingRedirect } from '../hooks/useOnboardingRedirect';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,102 +14,36 @@ import RippleGrid from '@/components/RippleGrid';
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [userClicked, setUserClicked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const { login, loginWithGoogle, error, clearError } = useAuth();
   const navigate = useNavigate();
-  
-  // Hook para manejar redirección automática
+
   useAuthRedirect();
-  
-  // Hook para manejar onboarding de usuarios nuevos
   useOnboardingRedirect();
 
   const [isHeaderVisible, setIsHeaderVisible] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setIsHeaderVisible(true);
-      } else {
-        setIsHeaderVisible(false);
-      }
-    };
-
+    const handleScroll = () => setIsHeaderVisible(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Resetear todo cuando se monta el componente
-  React.useEffect(() => {
-    setUserClicked(false);
+  useEffect(() => {
     clearError();
   }, []);
-
-  // Comprobar conexión con Supabase al cargar (no bloquea el formulario)
-  useEffect(() => {
-    let cancelled = false;
-    const timeoutMs = 12000;
-    const check = async () => {
-      try {
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), timeoutMs)
-        );
-        await Promise.race([sessionPromise, timeoutPromise]);
-        if (!cancelled) setConnectionOk(true);
-      } catch {
-        if (!cancelled) setConnectionOk(false);
-      }
-    };
-    check();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Resetear el estado de clic cuando cambien los campos
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
-    setUserClicked(false); // Resetear cuando cambie el email
-  };
-
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
-    setUserClicked(false); // Resetear cuando cambie la contraseña
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('🔍 handleSubmit ejecutado');
-    console.log('📧 Email:', email);
-    console.log('🔒 Password:', password ? '***' : 'vacío');
-    console.log('👆 UserClicked:', userClicked);
-    
-    // Verificar que los campos no estén vacíos
-    if (!email || !password) {
-      console.log('❌ Campos vacíos, no ejecutar login');
-      return;
-    }
-    
-    // Verificar que el usuario realmente hizo clic
-    if (!userClicked) {
-      console.log('❌ No se detectó clic del usuario, no ejecutar login');
-      return;
-    }
-    
-    console.log('✅ Usuario hizo clic en iniciar sesión - procediendo con login');
+    if (!email || !password || isSubmitting) return;
+
     clearError();
     setIsSubmitting(true);
-
     try {
       await login(email, password);
-      // No navegar aquí: useAuthRedirect redirige cuando user esté actualizado en estado.
-      // Así evitamos que ProtectedRoute vea user null y nos mande de vuelta a login.
-    } catch (error) {
-      console.error('Error al iniciar sesión:', error);
+      // La redirección la gestiona useAuthRedirect cuando el user quede en estado.
+    } catch {
+      // Error ya guardado en contexto; permanecemos en la página
     } finally {
       setIsSubmitting(false);
     }
@@ -219,8 +152,9 @@ const LoginPage = () => {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={handleEmailChange}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                   placeholder="tu@ejemplo.com"
                   className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
                 />
@@ -232,8 +166,9 @@ const LoginPage = () => {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={handlePasswordChange}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   placeholder="Tu contraseña"
                   className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
                 />
@@ -241,12 +176,8 @@ const LoginPage = () => {
 
               <Button
                 type="submit"
-                onClick={() => {
-                  console.log('🖱️ Botón de login clickeado');
-                  setUserClicked(true);
-                }}
                 className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold py-4 h-12 shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 text-base"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !email || !password}
               >
                 {isSubmitting ? (
                   <>

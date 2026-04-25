@@ -49,101 +49,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isAuthenticated = !!user && user.id;
+  const isAuthenticated = !!user && !!user.id;
+
+  // Construir un perfil "rápido" desde la sesión de Supabase para setear el usuario
+  // inmediatamente; el perfil completo se carga en background.
+  const buildQuickUser = (supabaseUser: SupabaseUser): User => ({
+    id: supabaseUser.id,
+    email: supabaseUser.email || '',
+    firstName: supabaseUser.user_metadata?.first_name || 'Usuario',
+    lastName: supabaseUser.user_metadata?.last_name || '',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  });
 
   // Verificar autenticación al cargar la aplicación
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout | null = null;
 
     const checkAuth = async () => {
       try {
-        console.log('🔍 Verificando sesión existente...');
-        
-        // Timeout de seguridad: si la verificación tarda más de 10s (proyecto puede estar "despertando"), continuar sin sesión
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error('Timeout')), 10000);
-        });
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-        let sessionResult;
-        try {
-          sessionResult = await Promise.race([
-            sessionPromise,
-            timeoutPromise
-          ]);
-        } catch (raceError: any) {
-          if (raceError.message === 'Timeout') {
-            console.warn('⚠️ Timeout verificando sesión, continuando sin autenticación');
-            if (isMounted) {
-              setIsLoading(false);
-            }
-            return;
-          }
-          throw raceError;
-        }
-        
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
-        
         if (!isMounted) return;
-        
-        const { data: { session }, error: sessionError } = sessionResult;
-        
-        // Si Supabase devuelve error (ej. refresh token inválido), limpiar sesión para que el próximo login sea limpio
+
         if (sessionError) {
-          console.warn('⚠️ Error de sesión (ej. refresh token inválido), limpiando...', sessionError.message);
+          console.warn('⚠️ Error de sesión, limpiando:', sessionError.message);
           await supabase.auth.signOut();
+          return;
         }
-        
+
         if (session?.user) {
-          console.log('👤 Sesión encontrada:', session.user.email);
-          // Crear perfil básico inmediatamente
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            firstName: session.user.user_metadata?.first_name || 'Usuario',
-            lastName: session.user.user_metadata?.last_name || '',
-            isActive: true,
-            createdAt: new Date().toISOString(),
-          });
-        } else {
-          console.log('🚪 No hay sesión activa');
+          setUser(buildQuickUser(session.user));
+          // Hidratar perfil completo en background (no bloquea el render)
+          loadUserProfile(session.user).catch(() => { /* ya hay perfil rápido */ });
         }
-      } catch (error: any) {
-        console.error('❌ Error verificando autenticación:', error);
+      } catch (err) {
+        console.error('❌ Error verificando sesión:', err);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
+        if (isMounted) setIsLoading(false);
       }
     };
 
     checkAuth();
 
-    // Escuchar cambios en la autenticación
+    // Escuchar cambios de sesión. Fuente única de verdad para el estado del usuario.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
-        
-        console.log('Auth state change:', event, session?.user?.id);
-        
+
         if (event === 'SIGNED_IN' && session?.user) {
-          console.log('Usuario firmado, cargando perfil...');
-          await loadUserProfile(session.user);
+          // Setear usuario inmediatamente para desbloquear la UI
+          setUser(buildQuickUser(session.user));
+          setIsLoading(false);
+          // Hidratar perfil completo sin bloquear
+          loadUserProfile(session.user).catch(() => { /* perfil rápido ya seteado */ });
         } else if (event === 'SIGNED_OUT') {
-          console.log('Usuario deslogueado');
           setUser(null);
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          console.log('Token refrescado, manteniendo sesión...');
-          // No hacer nada, mantener el usuario actual
-        }
-        if (isMounted) {
           setIsLoading(false);
         }
       }
@@ -151,9 +112,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
       subscription.unsubscribe();
     };
   }, []);
@@ -252,69 +210,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async (email: string, password: string) => {
+    setError(null);
+
+    // Login de prueba solo si está habilitado por env (nunca en producción)
+    const allowTestLogin = import.meta.env.VITE_ALLOW_TEST_LOGIN === 'true';
+    const testEmail = import.meta.env.VITE_TEST_LOGIN_EMAIL;
+    const testPassword = import.meta.env.VITE_TEST_LOGIN_PASSWORD;
+    if (allowTestLogin && testEmail && testPassword && email === testEmail && password === testPassword) {
+      setUser({
+        id: 'test-user-12345',
+        email: testEmail,
+        firstName: 'Usuario',
+        lastName: 'Prueba',
+        isActive: true,
+        createdAt: new Date().toISOString(),
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    const LOGIN_TIMEOUT_MS = 15000;
+
+    // Escuchamos SIGNED_IN como "backup": si el cliente Supabase-JS no resuelve
+    // la promesa de signInWithPassword (bug conocido bajo ciertas condiciones),
+    // el evento SIGNED_IN sí se dispara y lo usamos para considerar el login exitoso.
+    let signedInSub: { unsubscribe: () => void } | null = null;
+    const signedInPromise = new Promise<void>((resolve) => {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) resolve();
+      });
+      signedInSub = data.subscription;
+    });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), LOGIN_TIMEOUT_MS);
+    });
+
+    let authError: Error | null = null;
+    const authPromise = supabase.auth.signInWithPassword({ email, password }).then(
+      (res) => {
+        if (res.error) {
+          authError = res.error;
+          throw res.error;
+        }
+        return res;
+      },
+      (err) => {
+        authError = err instanceof Error ? err : new Error(String(err));
+        throw authError;
+      }
+    );
+    // Evitar unhandled rejection si signedInPromise gana pero authPromise falla después.
+    authPromise.catch(() => { /* error capturado en authError */ });
+
     try {
-      setError(null);
-      // No usar setIsLoading(true) aquí: es solo para la verificación inicial de sesión.
-      // Si lo activamos, la app entera muestra "Cargando aplicación..." y si la petición
-      // se cuelga, el usuario se queda atascado.
-      
-      console.log('🚀 Iniciando proceso de login para:', email);
-      
-      // Login de prueba solo si está habilitado por env (nunca en producción)
-      const allowTestLogin = import.meta.env.VITE_ALLOW_TEST_LOGIN === 'true';
-      const testEmail = import.meta.env.VITE_TEST_LOGIN_EMAIL;
-      const testPassword = import.meta.env.VITE_TEST_LOGIN_PASSWORD;
-      if (allowTestLogin && testEmail && testPassword && email === testEmail && password === testPassword) {
-        console.log('🧪 Usando credenciales de prueba - login local');
-        const testUser = {
-          id: 'test-user-12345',
-          email: testEmail,
-          firstName: 'Usuario',
-          lastName: 'Prueba',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        };
-        setUser(testUser);
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log('📡 Enviando credenciales a Supabase...');
-      // 35s para dar tiempo a que el proyecto Supabase "despierte" si está pausado (plan free)
-      const LOGIN_TIMEOUT_MS = 35000;
-      const loginPromise = supabase.auth.signInWithPassword({ email, password });
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), LOGIN_TIMEOUT_MS);
-      });
-      const result = await Promise.race([loginPromise, timeoutPromise]).catch((err: unknown) => {
-        if (err instanceof Error) throw err;
-        throw new Error(String(err));
-      });
-      const { data, error } = result;
-
-      if (error) {
-        console.error('❌ Error de autenticación:', error);
-        setError(error.message);
-        throw error;
-      }
-
-      if (data?.user) {
-        console.log('✅ Usuario autenticado exitosamente:', data.user.email);
-        const userProfile = {
-          id: data.user.id,
-          email: data.user.email || '',
-          firstName: data.user.user_metadata?.first_name || 'Usuario',
-          lastName: data.user.user_metadata?.last_name || '',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        };
-        setUser(userProfile);
-        console.log('👤 Perfil de usuario creado:', userProfile);
-        console.log('🎉 Login completado exitosamente');
-      }
-    } catch (error: unknown) {
-      console.error('Error en login:', error);
-      const msg = error instanceof Error ? error.message : String(error);
+      // Ganador: (a) respuesta de la API, (b) evento SIGNED_IN o (c) timeout.
+      // Si authPromise rechaza con error real de credenciales, lo relanzamos; si gana
+      // signedInPromise, el login fue correcto vía evento.
+      await Promise.race([authPromise, signedInPromise, timeoutPromise]);
+      if (authError) throw authError;
+      // En cualquier caso de éxito, onAuthStateChange ya setea el usuario.
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
       let errorMessage = 'Error inesperado al iniciar sesión';
       if (msg.includes('Invalid login credentials')) {
         errorMessage = 'Email o contraseña incorrectos.';
@@ -324,17 +281,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         errorMessage = 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
       } else if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
         errorMessage = 'Error de conexión. Verifica tu internet y que la app pueda conectar con Supabase.';
-      } else if (msg === 'LOGIN_TIMEOUT' || msg.includes('tardando demasiado')) {
-        const isLocal = typeof window !== 'undefined' && window.location?.origin?.includes('localhost');
-        errorMessage = 'La conexión con Supabase tardó demasiado. Comprueba: 1) Que estés en el proyecto correcto en el Dashboard (Authentication > URL Configuration). 2) Si el proyecto está pausado, espera a que reactive. 3) Tu conexión a internet.';
-        if (isLocal && typeof window !== 'undefined' && window.location?.origin) {
-          errorMessage += ` En local, añade ${window.location.origin} en Authentication > URL Configuration > Redirect URLs.`;
-        }
+      } else if (msg === 'LOGIN_TIMEOUT') {
+        errorMessage = 'La conexión con Supabase tardó demasiado. Verifica tu conexión a internet e intenta nuevamente. Si el problema persiste, el proyecto puede estar pausado en el Dashboard.';
       } else if (msg) {
         errorMessage = msg;
       }
       setError(errorMessage);
-      throw error;
+      throw err;
+    } finally {
+      signedInSub?.unsubscribe();
     }
   };
 
