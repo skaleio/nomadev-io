@@ -91,6 +91,7 @@ export type DropiDashboardMetrics = {
   gananciaPromedioEntregado: number;
   inversionMeta: number;
   roasFacturacion: number | null;
+  roasVentas: number | null;
   roasReal: number | null;
   cpa: number | null;
   aov: number;
@@ -117,6 +118,7 @@ export type DropiDashboardMetrics = {
  * - Ganancia estimada: suma GANANCIA en todos los no cancelados (incluye en tránsito / novedad / devolución).
  * - AOV: total vendido / pedidos que entran en total vendido.
  * - ROAS facturación: facturación confirmados / inversión Meta.
+ * - ROAS ventas: total vendido / inversión Meta.
  * - ROAS real: ganancia real / inversión Meta.
  * - CPA: inversión Meta / pedidos entregados.
  */
@@ -164,6 +166,7 @@ export function computeDropiMetrics(
 
   const inversionMeta = metaAdSpend;
   const roasFacturacion = inversionMeta > 0 ? facturacionConfirmados / inversionMeta : null;
+  const roasVentas = inversionMeta > 0 ? totalVendido / inversionMeta : null;
   const roasReal = inversionMeta > 0 ? gananciaReal / inversionMeta : null;
   const cpa = inversionMeta > 0 && entCount > 0 ? inversionMeta / entCount : null;
 
@@ -196,6 +199,7 @@ export function computeDropiMetrics(
     gananciaPromedioEntregado,
     inversionMeta,
     roasFacturacion,
+    roasVentas,
     roasReal,
     cpa,
     aov,
@@ -222,32 +226,19 @@ export type TopProductInsight = {
   pctConfirmados: number;
   pctDevolucion: number;
   pctCancelados: number;
+  /** Meta atribuida a esta categoría / pedidos entregados (misma lógica que CPA global). */
+  cpa: number | null;
   breakevenPorPedido: number | null;
   profitNetoPorPedido: number | null;
   precioSugerido: number | null;
 };
 
-/**
- * KPIs del producto #1: precio medio, tasas por estado, y unidades económicas por pedido entregado.
- * Breakeven/pedido = coste variable medio (proveedor+flete+comisiones) + reparto proporcional de Meta / entregados.
- * Profit neto/pedido = ganancia bruta media entregado − reparto Meta por entregado.
- * Precio sugerido = breakeven × 1,30 (margen objetivo del 30 % sobre punto muerto).
- */
-export function computeTopProductInsight(
-  allOrdersInRange: DropiOrderForMetrics[],
-  filters: DropiMetricsFilters,
-  topLabel: string,
-  metaSpend: number,
-): TopProductInsight | null {
-  const forAttribution = filterDropiOrders(allOrdersInRange, {
-    region: "all",
-    product: filters.product,
-    carrier: filters.carrier,
-  });
-  const slice = forAttribution.filter((o) => ((o.categories ?? "").trim() || "Sin categoría") === topLabel);
-  if (!slice.length) return null;
+function productCategoryLabel(o: DropiOrderForMetrics): string {
+  return (o.categories ?? "").trim() || "Sin categoría";
+}
 
-  const metaSlice = metaSpend * (slice.length / Math.max(forAttribution.length, 1));
+function buildProductInsight(label: string, slice: DropiOrderForMetrics[], metaSlice: number): TopProductInsight | null {
+  if (!slice.length) return null;
 
   const delivered = slice.filter((o) => o.status_bucket === "delivered");
   const inTransit = slice.filter((o) => o.status_bucket === "in_transit");
@@ -273,18 +264,89 @@ export function computeTopProductInsight(
     precioSugerido = breakevenPorPedido * 1.3;
   }
 
+  const entCount = delivered.length;
+  const cpa = metaSlice > 0 && entCount > 0 ? metaSlice / entCount : null;
+
   return {
-    label: topLabel,
+    label,
     pedidos: n,
     precioPromedio,
     pctEntregados: pct(delivered.length, n),
     pctConfirmados: pct(inTransit.length, n),
     pctDevolucion: pct(ret.length, n),
     pctCancelados: pct(canc.length, n),
+    cpa,
     breakevenPorPedido,
     profitNetoPorPedido,
     precioSugerido,
   };
+}
+
+export type ProductInsightsBreakdown = {
+  general: TopProductInsight | null;
+  byProduct: TopProductInsight[];
+};
+
+/**
+ * Resumen general (todas las categorías del slice) + una tarjeta por categoría importada.
+ * Respeta región y transportadora del filtro; ignora filtro de producto para listar todas las categorías.
+ * Meta se prorratea por volumen de pedidos en cada categoría; en "general" se usa el gasto completo.
+ */
+export function computeAllProductInsights(
+  allOrdersInRange: DropiOrderForMetrics[],
+  filters: DropiMetricsFilters,
+  metaSpend: number,
+): ProductInsightsBreakdown {
+  const forAttribution = filterDropiOrders(allOrdersInRange, {
+    region: filters.region,
+    product: "all",
+    carrier: filters.carrier,
+  });
+  if (!forAttribution.length) return { general: null, byProduct: [] };
+
+  const general = buildProductInsight("General (todas las categorías)", forAttribution, metaSpend);
+
+  const byLabel = new Map<string, DropiOrderForMetrics[]>();
+  for (const o of forAttribution) {
+    const lab = productCategoryLabel(o);
+    const arr = byLabel.get(lab) ?? [];
+    arr.push(o);
+    byLabel.set(lab, arr);
+  }
+  const baseLen = forAttribution.length;
+  const byProduct = [...byLabel.entries()]
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "es"))
+    .map(([lab, slice]) => {
+      const metaSlice = metaSpend * (slice.length / Math.max(baseLen, 1));
+      return buildProductInsight(lab, slice, metaSlice);
+    })
+    .filter((x): x is TopProductInsight => x != null);
+
+  return { general, byProduct };
+}
+
+/**
+ * KPIs del producto #1: precio medio, tasas por estado, y unidades económicas por pedido entregado.
+ * Breakeven/pedido = coste variable medio (proveedor+flete+comisiones) + reparto proporcional de Meta / entregados.
+ * Profit neto/pedido = ganancia bruta media entregado − reparto Meta por entregado.
+ * Precio sugerido = breakeven × 1,30 (margen orientativo).
+ */
+export function computeTopProductInsight(
+  allOrdersInRange: DropiOrderForMetrics[],
+  filters: DropiMetricsFilters,
+  topLabel: string,
+  metaSpend: number,
+): TopProductInsight | null {
+  const forAttribution = filterDropiOrders(allOrdersInRange, {
+    region: "all",
+    product: filters.product,
+    carrier: filters.carrier,
+  });
+  const slice = forAttribution.filter((o) => productCategoryLabel(o) === topLabel);
+  if (!slice.length) return null;
+
+  const metaSlice = metaSpend * (slice.length / Math.max(forAttribution.length, 1));
+  return buildProductInsight(topLabel, slice, metaSlice);
 }
 
 export type DailyProfitPoint = {

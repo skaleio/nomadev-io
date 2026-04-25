@@ -24,6 +24,11 @@ import LeadsPage from "./pages/LeadsPage";
 import ShopifyPage from "./pages/ShopifyPage";
 import SettingsPage from "./pages/SettingsPage";
 import ProfilePage from "./pages/ProfilePage";
+import BillingPage from "./pages/BillingPage";
+import KeyboardShortcutsPage from "./pages/KeyboardShortcutsPage";
+import TeamIndexPage from "./pages/TeamIndexPage";
+import TeamNewPage from "./pages/TeamNewPage";
+import TeamInvitePage from "./pages/TeamInvitePage";
 import ShopifyConnectPage from "./pages/ShopifyConnectPage";
 import DropiPage from "./pages/DropiPage";
 import DropiConnectPage from "./pages/DropiConnectPage";
@@ -125,6 +130,11 @@ const AppContent = () => {
                        <Route path="/crm" element={<ProtectedRoute><CRMPage /></ProtectedRoute>} />
                        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
                        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+                       <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+                       <Route path="/keyboard-shortcuts" element={<ProtectedRoute><KeyboardShortcutsPage /></ProtectedRoute>} />
+                       <Route path="/team" element={<ProtectedRoute><TeamIndexPage /></ProtectedRoute>} />
+                       <Route path="/team/new" element={<ProtectedRoute><TeamNewPage /></ProtectedRoute>} />
+                       <Route path="/team/invite/:channel" element={<ProtectedRoute><TeamInvitePage /></ProtectedRoute>} />
               
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

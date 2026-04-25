@@ -87,6 +87,7 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import { Input } from "../ui/input";
+import { isGloballyLockedPath } from "@/lib/lockedNavPaths";
 
 type NavItem = {
   title: string;
@@ -379,7 +380,9 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
     const queryLower = query.toLowerCase();
     const queryWords = queryLower.split(' ').filter(word => word.length > 0);
     
-    const filteredResults = searchDatabase.filter(result => {
+    const filteredResults = searchDatabase.filter((result) => {
+      if (isGloballyLockedPath(result.url)) return false;
+
       // Búsqueda en título y descripción
       const titleMatch = result.title.toLowerCase().includes(queryLower);
       const descriptionMatch = result.description.toLowerCase().includes(queryLower);
@@ -536,9 +539,9 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
       </Sidebar>
 
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-[3.25rem] shrink-0 items-center gap-2 border-b border-border/40 bg-background/65 px-4 shadow-[inset_0_-1px_0_0_hsl(var(--border)/0.25)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/50">
+        <header className="sticky top-0 z-30 grid h-[3.25rem] shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-border/40 bg-background/65 px-4 shadow-[inset_0_-1px_0_0_hsl(var(--border)/0.25)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/50">
           {/* Left section */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 items-center justify-self-start gap-1.5">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mx-1 h-4" />
             <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
@@ -625,8 +628,29 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
             )}
           </div>
 
+          {/* Wordmark NOMADEV.IO (Orbitron + glow, mismo criterio que DashboardHeader / LoadingLogo) */}
+          <NavLink
+            to="/dashboard"
+            className="shrink-0 rounded-md px-1 py-0.5 outline-none ring-offset-background transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            aria-label="NOMADEV.IO — ir al inicio"
+          >
+            <span
+              className="block whitespace-nowrap text-sm font-black uppercase tracking-[0.14em] text-teal-400 sm:text-base"
+              style={{
+                fontFamily: "'Orbitron', 'Arial Black', sans-serif",
+                fontWeight: 900,
+                transform: "skew(-3deg)",
+                textShadow:
+                  "0 0 6px rgba(45,212,191,0.95), 0 0 14px rgba(45,212,191,0.65), 0 0 26px rgba(45,212,191,0.35)",
+                filter: "drop-shadow(0 0 10px rgba(45,212,191,0.45))",
+              }}
+            >
+              NOMADEV.IO
+            </span>
+          </NavLink>
+
           {/* Right section */}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="flex min-w-0 items-center justify-self-end gap-1">
             {/* Botón de notificaciones con funcionalidad */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

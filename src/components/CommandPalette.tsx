@@ -14,8 +14,6 @@ import {
   Truck,
   Users,
   Settings,
-  TrendingUp,
-  FileText,
   Package,
   Bell,
   LogOut,
@@ -27,8 +25,11 @@ import {
   Home,
   ChevronRight,
   UserCheck,
+  Command,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isGloballyLockedPath } from '@/lib/lockedNavPaths';
 
 interface Command {
   id: string;
@@ -38,6 +39,8 @@ interface Command {
   action: () => void;
   category: 'navigation' | 'actions' | 'settings' | 'theme';
   keywords: string[];
+  /** Ruta de destino si la acción navega; se oculta si la zona está bloqueada en el sidebar. */
+  targetPath?: string;
 }
 
 interface CommandPaletteProps {
@@ -52,8 +55,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [theme] = useState<'dark'>('dark');
 
-  // Definir comandos
-  const commands: Command[] = [
+  // Definir comandos (los que apuntan a rutas bloqueadas en el sidebar se filtran abajo)
+  const allCommands: Command[] = [
     // Navegación
     {
       id: 'nav-dashboard',
@@ -63,6 +66,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/dashboard'),
       category: 'navigation',
       keywords: ['dashboard', 'inicio', 'home', 'principal'],
+      targetPath: '/dashboard',
     },
     {
       id: 'nav-chat',
@@ -72,6 +76,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/chat'),
       category: 'navigation',
       keywords: ['chat', 'whatsapp', 'conversaciones', 'mensajes'],
+      targetPath: '/chat',
     },
     {
       id: 'nav-validation',
@@ -81,6 +86,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/validation'),
       category: 'navigation',
       keywords: ['validación', 'clientes', 'verificar', 'n8n'],
+      targetPath: '/validation',
     },
     {
       id: 'nav-shopify',
@@ -90,15 +96,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/shopify'),
       category: 'navigation',
       keywords: ['shopify', 'analytics', 'tienda', 'ventas'],
+      targetPath: '/shopify',
     },
     {
       id: 'nav-orders',
-      title: 'Validación de Pedidos',
-      subtitle: 'Gestionar pedidos',
+      title: 'Gestión de Pedidos',
+      subtitle: 'Ver y administrar pedidos',
       icon: Package,
       action: () => navigate('/orders'),
       category: 'navigation',
-      keywords: ['pedidos', 'orders', 'validación'],
+      keywords: ['pedidos', 'orders', 'gestión', 'órdenes'],
+      targetPath: '/orders',
     },
     {
       id: 'nav-tracking',
@@ -108,6 +116,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/tracking'),
       category: 'navigation',
       keywords: ['tracking', 'envíos', 'seguimiento', 'paquetes'],
+      targetPath: '/tracking',
     },
     {
       id: 'nav-leads',
@@ -117,6 +126,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/leads'),
       category: 'navigation',
       keywords: ['leads', 'prospectos', 'clientes potenciales'],
+      targetPath: '/leads',
     },
     {
       id: 'nav-crm',
@@ -126,6 +136,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/crm'),
       category: 'navigation',
       keywords: ['crm', 'pipeline', 'ventas', 'oportunidades', 'prospectos'],
+      targetPath: '/crm',
     },
     {
       id: 'nav-settings',
@@ -135,6 +146,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/settings'),
       category: 'navigation',
       keywords: ['configuración', 'settings', 'ajustes'],
+      targetPath: '/settings',
     },
     {
       id: 'nav-profile',
@@ -144,6 +156,37 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/profile'),
       category: 'navigation',
       keywords: ['perfil', 'profile', 'usuario', 'cuenta'],
+      targetPath: '/profile',
+    },
+    {
+      id: 'nav-billing',
+      title: 'Facturación',
+      subtitle: 'Plan e historial de facturación',
+      icon: CreditCard,
+      action: () => navigate('/billing'),
+      category: 'navigation',
+      keywords: ['facturación', 'billing', 'plan', 'pago', 'suscripción'],
+      targetPath: '/billing',
+    },
+    {
+      id: 'nav-keyboard-shortcuts',
+      title: 'Atajos de teclado',
+      subtitle: 'Referencia de combinaciones',
+      icon: Command,
+      action: () => navigate('/keyboard-shortcuts'),
+      category: 'navigation',
+      keywords: ['atajos', 'teclado', 'shortcuts', 'combinaciones'],
+      targetPath: '/keyboard-shortcuts',
+    },
+    {
+      id: 'nav-team',
+      title: 'Equipo',
+      subtitle: 'Miembros e invitaciones',
+      icon: Users,
+      action: () => navigate('/team'),
+      category: 'navigation',
+      keywords: ['equipo', 'team', 'miembros', 'invitar', 'colaboradores'],
+      targetPath: '/team',
     },
 
     // Acciones rápidas
@@ -158,6 +201,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       },
       category: 'actions',
       keywords: ['nuevo', 'chat', 'conversación', 'mensaje'],
+      targetPath: '/chat',
     },
     {
       id: 'action-validate-client',
@@ -169,6 +213,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       },
       category: 'actions',
       keywords: ['validar', 'cliente', 'verificar'],
+      targetPath: '/validation',
     },
     {
       id: 'action-export-data',
@@ -202,6 +247,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       action: () => navigate('/shopify'),
       category: 'actions',
       keywords: ['análisis', 'analytics', 'métricas', 'estadísticas'],
+      targetPath: '/shopify',
     },
     {
       id: 'action-notifications',
@@ -233,6 +279,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       keywords: ['cerrar', 'salir', 'logout', 'desconectar'],
     },
   ];
+
+  const commands = allCommands.filter(
+    (c) => !c.targetPath || !isGloballyLockedPath(c.targetPath)
+  );
 
   // Filtrar comandos según búsqueda
   const filteredCommands = commands.filter((command) => {

@@ -17,7 +17,7 @@ import {
   computeDailyProfitTrend,
   computeDropiMetrics,
   computeMetricsByCarrier,
-  computeTopProductInsight,
+  computeAllProductInsights,
   detectDateRange,
   filterDropiOrders,
   formatRoas,
@@ -40,6 +40,7 @@ import {
   Check,
   Filter,
   Search,
+  ChevronDown,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -128,6 +129,9 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [chartPeriodDays, setChartPeriodDays] = useState<1 | 7 | 14 | 30>(30);
   const [vizRegion, setVizRegion] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [regionFilterOpen, setRegionFilterOpen] = useState(false);
+  const [productFilterOpen, setProductFilterOpen] = useState(false);
+  const [carrierFilterOpen, setCarrierFilterOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
   const [postImport, setPostImport] = useState<{
     open: boolean;
@@ -323,11 +327,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     [filteredForMetrics, metaSpend],
   );
 
-  const topProductInsight = useMemo(() => {
-    const label = metrics.topProducto?.label;
-    if (!label) return null;
-    return computeTopProductInsight(ordersInMainRange, filters, label, metaSpend);
-  }, [ordersInMainRange, filters, metaSpend, metrics.topProducto?.label]);
+  const productInsights = useMemo(
+    () => computeAllProductInsights(ordersInMainRange, filters, metaSpend),
+    [ordersInMainRange, filters, metaSpend],
+  );
 
   const carrierBreakdown = useMemo(() => {
     const base = filterDropiOrders(ordersInMainRange, { region, product, carrier: "all" });
@@ -561,7 +564,6 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       {/* ── Métricas principales ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <MetricCard title="Total vendido" value={formatMoney(metrics.totalVendido)} icon={DollarSign} color="primary" description="Suma valor compra productos, excl. cancelados / anulados" loading={loading} />
-        <MetricCard title="Facturación confirmados" value={formatMoney(metrics.facturacionConfirmados)} icon={BarChart3} color="info" description="Solo filas con factura o valor facturado" loading={loading} />
         <MetricCard title="Ganancia real" value={formatMoney(metrics.gananciaReal)} icon={TrendingUp} color="success" description="Suma GANANCIA solo pedidos entregados" loading={loading} />
         <MetricCard title="Ganancia estimada" value={formatMoney(metrics.gananciaEstimada)} icon={TrendingUp} color="warning" description="Suma GANANCIA en todos los no cancelados" loading={loading} />
         <MetricCard title="Ganancia promedio" value={formatMoney(metrics.gananciaPromedioEntregado)} icon={Target} color="primary" description="Por pedido entregado" loading={loading} />
@@ -569,7 +571,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard title="Inversión Meta" value={formatMoney(metrics.inversionMeta)} icon={Megaphone} color="warning" description="Gasto en ads (manual)" loading={loading} />
-        <MetricCard title="ROAS facturación" value={formatRoas(metrics.roasFacturacion)} icon={BarChart3} color="info" description="Facturación confirmados / ads" loading={loading} />
+        <MetricCard title="ROAS ventas" value={formatRoas(metrics.roasVentas)} icon={DollarSign} color="info" description="Total vendido / ads" loading={loading} />
         <MetricCard title="ROAS real" value={formatRoas(metrics.roasReal)} icon={TrendingUp} color="success" description="Ganancia real / ads" loading={loading} />
         <MetricCard title="CPA" value={metrics.cpa != null ? formatMoney(metrics.cpa) : "—"} icon={Target} color="primary" description="Ads / pedidos entregados" loading={loading} />
         <MetricCard title="AOV" value={formatMoney(metrics.aov)} icon={Package} color="primary" description="Ticket promedio (total vendido / no cancelados)" loading={loading} />
@@ -800,38 +802,100 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         </CardContent>
       </Card>
 
-      {/* ── Producto #1 ── */}
-      {topProductInsight && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Producto #1 — {topProductInsight.label}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-lg border border-border/40 bg-muted/20 p-4 text-sm">
-              {[
-                { label: "Pedidos", value: topProductInsight.pedidos },
-                { label: "Precio promedio", value: formatMoney(topProductInsight.precioPromedio) },
-                { label: "Entrega", value: `${topProductInsight.pctEntregados}%` },
-                { label: "Confirmación *", value: `${topProductInsight.pctConfirmados}%` },
-                { label: "Devolución", value: `${topProductInsight.pctDevolucion}%` },
-                { label: "Cancelados", value: `${topProductInsight.pctCancelados}%` },
-              ].map((item) => (
-                <div key={item.label}>
-                  <div className="text-xs text-muted-foreground mb-0.5">{item.label}</div>
-                  <div className="font-semibold text-foreground tabular-nums">{item.value}</div>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              * Confirmación = pedidos en tránsito o en reparto (proxy operativo). Las categorías provienen del campo de categorías de cada pedido importado.
+      {/* ── Rendimiento por categoría (Excel) ── */}
+      {productInsights.general && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">Rendimiento por categoría</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Datos del rango de fechas y filtros de región / logística. Categorías según columna importada del Excel. Meta se prorratea por volumen en cada categoría; en &quot;General&quot; se usa el gasto completo del rango.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <MetricCard title="Breakeven / pedido" value={topProductInsight.breakevenPorPedido != null ? formatMoney(topProductInsight.breakevenPorPedido) : "—"} icon={Scale} description="Coste variable medio entregado + Meta prorrateada / entregado" loading={loading} />
-              <MetricCard title="Profit neto / pedido" value={topProductInsight.profitNetoPorPedido != null ? formatMoney(topProductInsight.profitNetoPorPedido) : "—"} icon={DollarSign} color="success" description="Ganancia media entregado − Meta prorrateada por entregado" loading={loading} />
-              <MetricCard title="Precio sugerido" value={topProductInsight.precioSugerido != null ? formatMoney(topProductInsight.precioSugerido) : "—"} icon={Target} description="Breakeven × 1,30 (margen orientativo)" loading={loading} />
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            {(() => {
+              const g = productInsights.general;
+              const list = productInsights.byProduct;
+              const singleCategory =
+                list.length === 1 && list[0].pedidos === g.pedidos ? list[0] : null;
+              const tiles = singleCategory
+                ? [{ ...g, label: `General · ${singleCategory.label}`, __single: true as const }]
+                : [g, ...list];
+              return tiles.map((ins) => {
+                const isGeneralOnly = "label" in ins && ins.label.startsWith("General (");
+                const isMergedSingle = "__single" in ins && ins.__single;
+                const isHighlight = isGeneralOnly || isMergedSingle;
+                const key =
+                  isMergedSingle && "label" in ins
+                    ? `merged-${String(ins.label)}`
+                    : ins.label.startsWith("General (")
+                      ? "__general__"
+                      : ins.label;
+                return (
+                  <Card
+                    key={key}
+                    className={isHighlight ? "border-primary/25 bg-primary/[0.03]" : undefined}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base leading-snug">
+                        {isMergedSingle && "label" in ins
+                          ? ins.label
+                          : isGeneralOnly
+                            ? "Resumen general"
+                            : ins.label}
+                      </CardTitle>
+                      {isGeneralOnly ? (
+                        <p className="text-xs text-muted-foreground">Todas las categorías en este periodo y filtros.</p>
+                      ) : isMergedSingle ? (
+                        <p className="text-xs text-muted-foreground">Única categoría en este periodo; mismos totales que el resumen general.</p>
+                      ) : null}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-lg border border-border/40 bg-muted/20 p-4 text-sm">
+                        {[
+                          { label: "Pedidos", value: String(ins.pedidos) },
+                          { label: "Precio promedio", value: formatMoney(ins.precioPromedio) },
+                          { label: "Entrega", value: `${ins.pctEntregados}%` },
+                          { label: "Devolución", value: `${ins.pctDevolucion}%` },
+                          { label: "Cancelados", value: `${ins.pctCancelados}%` },
+                          { label: "CPA", value: ins.cpa != null ? formatMoney(ins.cpa) : "—" },
+                        ].map((item) => (
+                          <div key={item.label}>
+                            <div className="text-xs text-muted-foreground mb-0.5">{item.label}</div>
+                            <div className="font-semibold text-foreground tabular-nums">{item.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <MetricCard
+                          title="Breakeven / pedido"
+                          value={ins.breakevenPorPedido != null ? formatMoney(ins.breakevenPorPedido) : "—"}
+                          icon={Scale}
+                          description="Coste variable medio entregado + Meta atribuida / entregado"
+                          loading={loading}
+                        />
+                        <MetricCard
+                          title="Profit neto / pedido"
+                          value={ins.profitNetoPorPedido != null ? formatMoney(ins.profitNetoPorPedido) : "—"}
+                          icon={DollarSign}
+                          color="success"
+                          description="Ganancia media entregado − Meta atribuida por entregado"
+                          loading={loading}
+                        />
+                        <MetricCard
+                          title="Precio sugerido"
+                          value={ins.precioSugerido != null ? formatMoney(ins.precioSugerido) : "—"}
+                          icon={Target}
+                          description="Breakeven × 1,30 (margen orientativo)"
+                          loading={loading}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              });
+            })()}
+          </div>
+        </div>
       )}
 
       {/* ── Lista de pedidos ── */}
@@ -873,7 +937,18 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                   aria-label="Buscar en la lista de pedidos"
                 />
               </div>
-              <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <Popover
+                modal={false}
+                open={filtersOpen}
+                onOpenChange={(open) => {
+                  setFiltersOpen(open);
+                  if (!open) {
+                    setRegionFilterOpen(false);
+                    setProductFilterOpen(false);
+                    setCarrierFilterOpen(false);
+                  }
+                }}
+              >
                 <PopoverTrigger asChild>
                   <Button
                     type="button"
@@ -889,70 +964,226 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                     ) : null}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[min(100vw-1.5rem,400px)] p-0" align="end">
+                <PopoverContent className="w-[min(100vw-1.5rem,380px)] p-0" align="end">
                   <div className="border-b border-border/60 px-3 py-2.5">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Filtra por región, categoría de producto y transportadora. Los números son pedidos en el rango de fechas
-                      superior, según lo que ya tengas seleccionado en cada grupo.
+                      Abre cada desplegable para buscar y elegir. Los números son pedidos en el rango de fechas del panel
+                      superior, cruzados con lo que ya tengas en los otros filtros.
                     </p>
                   </div>
-                  <Command shouldFilter>
-                    <CommandInput placeholder="Buscar región, producto o logística…" className="h-10" />
-                    <CommandList className="max-h-[min(55vh,340px)]">
-                      <CommandEmpty>Nada coincide con la búsqueda.</CommandEmpty>
-                      <CommandGroup heading="Región">
-                        {regionFilterOptions.map((opt) => (
-                          <CommandItem
-                            key={`r-${opt.value}`}
-                            value={`región ${opt.label} ${opt.count}`}
-                            onSelect={() => setRegion(opt.value)}
-                            className="cursor-pointer"
+
+                  <div className="space-y-3 p-3">
+                    {/* Región */}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Región</p>
+                      <Popover
+                        modal={false}
+                        open={regionFilterOpen}
+                        onOpenChange={(open) => {
+                          setRegionFilterOpen(open);
+                          if (open) {
+                            setProductFilterOpen(false);
+                            setCarrierFilterOpen(false);
+                          }
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 w-full justify-between gap-2 rounded-lg border-border/80 bg-input/50 px-3 font-normal shadow-inner shadow-black/[0.03]"
+                            aria-expanded={regionFilterOpen}
                           >
-                            <span
-                              className="mr-2 size-2 shrink-0 rounded-full ring-1 ring-white/10"
-                              style={{
-                                backgroundColor: opt.value === "all" ? "hsl(var(--muted))" : regionChartColor(opt.label),
-                              }}
-                              aria-hidden
-                            />
-                            <span className="flex-1 truncate">{opt.label}</span>
-                            <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
-                            {region === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                      <CommandGroup heading="Producto / categoría">
-                        {productFilterOptions.map((opt) => (
-                          <CommandItem
-                            key={`p-${opt.value}`}
-                            value={`producto categoría ${opt.label} ${opt.count}`}
-                            onSelect={() => setProduct(opt.value)}
-                            className="cursor-pointer"
+                            <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                              {region !== "all" ? (
+                                <span
+                                  className="size-2 shrink-0 rounded-full ring-1 ring-white/20"
+                                  style={{ backgroundColor: regionChartColor(region) }}
+                                  aria-hidden
+                                />
+                              ) : null}
+                              <span className="truncate">
+                                {region === "all"
+                                  ? "Todas las regiones"
+                                  : regionFilterOptions.find((o) => o.value === region)?.label ?? region}
+                              </span>
+                              <Badge variant="soft" className="ml-auto shrink-0 tabular-nums text-[10px]">
+                                {region === "all"
+                                  ? regionFilterRows.length
+                                  : regionFilterOptions.find((o) => o.value === region)?.count ?? 0}
+                              </Badge>
+                            </span>
+                            <ChevronDown className="size-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={6}>
+                          <Command shouldFilter>
+                            <CommandInput placeholder="Buscar región…" className="h-9" />
+                            <CommandList className="max-h-[220px]">
+                              <CommandEmpty>Sin coincidencias.</CommandEmpty>
+                              <CommandGroup>
+                                {regionFilterOptions.map((opt) => (
+                                  <CommandItem
+                                    key={`r-${opt.value}`}
+                                    value={`${opt.label} ${opt.count}`}
+                                    onSelect={() => {
+                                      setRegion(opt.value);
+                                      setRegionFilterOpen(false);
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <span
+                                      className="mr-2 size-2 shrink-0 rounded-full ring-1 ring-white/10"
+                                      style={{
+                                        backgroundColor: opt.value === "all" ? "hsl(var(--muted))" : regionChartColor(opt.label),
+                                      }}
+                                      aria-hidden
+                                    />
+                                    <span className="flex-1 truncate">{opt.label}</span>
+                                    <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
+                                    {region === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Producto */}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Producto / categoría</p>
+                      <Popover
+                        modal={false}
+                        open={productFilterOpen}
+                        onOpenChange={(open) => {
+                          setProductFilterOpen(open);
+                          if (open) {
+                            setRegionFilterOpen(false);
+                            setCarrierFilterOpen(false);
+                          }
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 w-full justify-between gap-2 rounded-lg border-border/80 bg-input/50 px-3 font-normal shadow-inner shadow-black/[0.03]"
+                            aria-expanded={productFilterOpen}
                           >
-                            <Package className="mr-2 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                            <span className="flex-1 truncate">{opt.label}</span>
-                            <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
-                            {product === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                      <CommandGroup heading="Logística">
-                        {carrierFilterOptions.map((opt) => (
-                          <CommandItem
-                            key={`c-${opt.value}`}
-                            value={`logística transporte ${opt.label} ${opt.count}`}
-                            onSelect={() => setCarrier(opt.value)}
-                            className="cursor-pointer"
+                            <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                              <Package className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                              <span className="truncate">
+                                {product === "all"
+                                  ? "Todos los productos"
+                                  : productFilterOptions.find((o) => o.value === product)?.label ?? product}
+                              </span>
+                              <Badge variant="soft" className="ml-auto shrink-0 tabular-nums text-[10px]">
+                                {product === "all"
+                                  ? productFilterRows.length
+                                  : productFilterOptions.find((o) => o.value === product)?.count ?? 0}
+                              </Badge>
+                            </span>
+                            <ChevronDown className="size-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={6}>
+                          <Command shouldFilter>
+                            <CommandInput placeholder="Buscar categoría…" className="h-9" />
+                            <CommandList className="max-h-[220px]">
+                              <CommandEmpty>Sin coincidencias.</CommandEmpty>
+                              <CommandGroup>
+                                {productFilterOptions.map((opt) => (
+                                  <CommandItem
+                                    key={`p-${opt.value}`}
+                                    value={`${opt.label} ${opt.count}`}
+                                    onSelect={() => {
+                                      setProduct(opt.value);
+                                      setProductFilterOpen(false);
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <Package className="mr-2 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                    <span className="flex-1 truncate">{opt.label}</span>
+                                    <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
+                                    {product === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {/* Logística */}
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Logística</p>
+                      <Popover
+                        modal={false}
+                        open={carrierFilterOpen}
+                        onOpenChange={(open) => {
+                          setCarrierFilterOpen(open);
+                          if (open) {
+                            setRegionFilterOpen(false);
+                            setProductFilterOpen(false);
+                          }
+                        }}
+                      >
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 w-full justify-between gap-2 rounded-lg border-border/80 bg-input/50 px-3 font-normal shadow-inner shadow-black/[0.03]"
+                            aria-expanded={carrierFilterOpen}
                           >
-                            <Truck className="mr-2 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                            <span className="flex-1 truncate">{opt.label}</span>
-                            <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
-                            {carrier === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
+                            <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+                              <Truck className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                              <span className="truncate">
+                                {carrier === "all"
+                                  ? "Todas las logísticas"
+                                  : carrierFilterOptions.find((o) => o.value === carrier)?.label ?? carrier}
+                              </span>
+                              <Badge variant="soft" className="ml-auto shrink-0 tabular-nums text-[10px]">
+                                {carrier === "all"
+                                  ? carrierFilterRows.length
+                                  : carrierFilterOptions.find((o) => o.value === carrier)?.count ?? 0}
+                              </Badge>
+                            </span>
+                            <ChevronDown className="size-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" sideOffset={6}>
+                          <Command shouldFilter>
+                            <CommandInput placeholder="Buscar transportadora…" className="h-9" />
+                            <CommandList className="max-h-[220px]">
+                              <CommandEmpty>Sin coincidencias.</CommandEmpty>
+                              <CommandGroup>
+                                {carrierFilterOptions.map((opt) => (
+                                  <CommandItem
+                                    key={`c-${opt.value}`}
+                                    value={`${opt.label} ${opt.count}`}
+                                    onSelect={() => {
+                                      setCarrier(opt.value);
+                                      setCarrierFilterOpen(false);
+                                    }}
+                                    className="cursor-pointer"
+                                  >
+                                    <Truck className="mr-2 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                    <span className="flex-1 truncate">{opt.label}</span>
+                                    <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
+                                    {carrier === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 p-2">
                     <Button
                       type="button"

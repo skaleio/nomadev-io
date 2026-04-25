@@ -1,0 +1,1 @@
+- [Estado del sistema de diseño (2026-04-25)](project_design_state.md) — Snapshot de tokens, deuda visual, componentes y estado del roadmap tras auditoría inicial
