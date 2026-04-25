@@ -8,6 +8,14 @@ import { buttonVariants } from "@/components/ui/button";
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
 function Calendar({ className, classNames, showOutsideDays = true, ...props }: CalendarProps) {
+  const nowYear = new Date().getFullYear();
+  const captionLayout = (props as { captionLayout?: string }).captionLayout;
+  const shouldDefaultYearRange = captionLayout?.startsWith("dropdown");
+
+  // Si el consumidor pide dropdown pero no define rango, damos uno razonable.
+  const fromYear = shouldDefaultYearRange ? (props.fromYear ?? nowYear - 7) : props.fromYear;
+  const toYear = shouldDefaultYearRange ? (props.toYear ?? nowYear + 2) : props.toYear;
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -17,6 +25,15 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
+        caption_dropdowns: "flex items-center justify-center gap-2",
+        dropdown: "relative",
+        dropdown_month: "relative",
+        dropdown_year: "relative",
+        dropdown_icon: "pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-60",
+        dropdowns: "flex items-center justify-center gap-2",
+        /* Estilo del <select> en captionLayout='dropdown' */
+        select:
+          "h-9 appearance-none rounded-lg border border-border/70 bg-input/60 px-2.5 pr-9 text-sm text-foreground shadow-inner shadow-black/[0.03] outline-none transition-all duration-base ease-standard hover:bg-input/80 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -45,6 +62,8 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
       }}
+      fromYear={fromYear}
+      toYear={toYear}
       {...props}
     />
   );
