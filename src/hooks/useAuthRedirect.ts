@@ -23,8 +23,8 @@ export const useAuthRedirect = () => {
         const checkOnboardingStatus = async () => {
           try {
             const shopsPromise = supabase
-              .from('shops')
-              .select('id, is_active')
+              .from('shopify_connections')
+              .select('id')
               .eq('user_id', user.id)
               .eq('is_active', true);
             const timeoutPromise = new Promise<never>((_, reject) =>

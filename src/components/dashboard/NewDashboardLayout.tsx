@@ -287,10 +287,10 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
   useEffect(() => {
     async function checkShopifyConnection() {
       if (!user) return;
-      
+
       try {
         const { data, error } = await supabase
-          .from('shops')
+          .from('shopify_connections')
           .select('id')
           .eq('user_id', user.id)
           .eq('is_active', true)
@@ -430,27 +430,18 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
   return (
     <TooltipProvider>
       <SidebarProvider>
-      <Sidebar 
-        variant="inset" 
-        collapsible="icon" 
-        className="border-0"
-        style={{ 
-          border: 'none',
-          boxShadow: 'none',
-          outline: 'none'
-        }}
-      >
+      <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild>
                 <NavLink to="/dashboard">
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <Sparkles className="size-4" />
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground shadow-elev-1">
+                    <Sparkles className="size-4" strokeWidth={2.25} />
                   </div>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">NOMADEV.IO</span>
-                    <span className="truncate text-xs">Dashboard</span>
+                  <div className="grid flex-1 text-left leading-tight">
+                    <span className="truncate text-sm font-semibold tracking-tight">Nomadev</span>
+                    <span className="truncate text-2xs text-muted-foreground">Dropshipping OS</span>
                   </div>
                 </NavLink>
               </SidebarMenuButton>
@@ -460,7 +451,9 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-sm font-semibold">Navegación Principal</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-2xs font-medium uppercase tracking-wider text-muted-foreground">
+              Plataforma
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {navigationItems.map((item) => (
@@ -468,7 +461,7 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
                     {item.locked ? (
                       <SidebarMenuButton
                         tooltip={`${item.title} — Próximamente`}
-                        className="text-base opacity-60 cursor-not-allowed hover:bg-sidebar-accent/40"
+                        className="text-sm opacity-60 cursor-not-allowed hover:bg-sidebar-accent/40"
                         onClick={() =>
                           toast(`${item.title} — Próximamente`, {
                             description:
@@ -476,10 +469,10 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
                           })
                         }
                       >
-                        <item.icon className="size-4" />
+                        <item.icon className="size-4" strokeWidth={1.75} />
                         <span className="flex-1 truncate">{item.title}</span>
-                        <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-amber-500/90 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
-                          <Lock className="size-3" /> Pronto
+                        <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
+                          <Lock className="size-2.5" /> Soon
                         </span>
                       </SidebarMenuButton>
                     ) : (
@@ -487,10 +480,10 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
                         asChild
                         isActive={isActive(item.url)}
                         tooltip={item.title}
-                        className="text-base"
+                        className="text-sm"
                       >
                         <NavLink to={item.url}>
-                          <item.icon className="size-4" />
+                          <item.icon className="size-4" strokeWidth={1.75} />
                           <span>{item.title}</span>
                         </NavLink>
                       </SidebarMenuButton>
@@ -542,22 +535,24 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset 
-        className="border-0"
-        style={{ 
-          border: 'none',
-          boxShadow: 'none',
-          outline: 'none'
-        }}
-      >
-        <header className="relative flex h-16 shrink-0 items-center border-b px-4 bg-background rounded-t-lg">
+      <SidebarInset>
+        <header className="sticky top-0 z-30 flex h-[3.25rem] shrink-0 items-center gap-2 border-b border-border/40 bg-background/65 px-4 shadow-[inset_0_-1px_0_0_hsl(var(--border)/0.25)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/50">
           {/* Left section */}
-          <div className="flex items-center gap-2">
-            <SidebarTrigger className="-ml-1 border-0 bg-transparent hover:bg-transparent" />
+          <div className="flex items-center gap-1.5">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mx-1 h-4" />
             <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <Search className="size-4" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-2 rounded-full border border-transparent px-3 text-muted-foreground font-normal hover:border-border/50 hover:bg-muted/50"
+                >
+                  <Search className="size-3.5 opacity-80" />
+                  <span className="hidden sm:inline text-xs">Buscar...</span>
+                  <kbd className="hidden md:inline-flex pointer-events-none ml-1 h-5 select-none items-center gap-1 rounded-full border border-border/50 bg-muted/35 px-2 font-mono text-[10px] font-medium text-muted-foreground">
+                    ⌘K
+                  </kbd>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
@@ -619,48 +614,28 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
                 </div>
               </DialogContent>
             </Dialog>
-            <Separator orientation="vertical" className="mr-2 h-4" />
             {hasShopifyConnection && (
-              <Badge variant="outline" className="text-xs">
-                <Activity className="size-3 mr-1" />
-                Conectado
+              <Badge variant="success" className="ml-1">
+                <span className="relative flex size-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-success" />
+                </span>
+                Live
               </Badge>
             )}
           </div>
 
-          {/* Center section - Logo NOMADEV.IO */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
-            <span 
-              className="text-3xl font-black tracking-wider animate-pulse"
-              style={{
-                color: '#14b8a6',
-                textShadow: '0 0 5px #14b8a6, 0 0 10px #14b8a6, 0 0 15px #14b8a6',
-                fontFamily: '"Orbitron", "Exo 2", "Rajdhani", "Roboto Condensed", "Arial Black", sans-serif',
-                fontWeight: '900',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                fontStretch: 'condensed',
-                animation: 'pulse 3s ease-in-out infinite'
-              }}
-            >
-              NOMADEV.IO
-            </span>
-          </div>
-
           {/* Right section */}
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1">
             {/* Botón de notificaciones con funcionalidad */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon-sm" className="relative">
                   <Bell className="size-4" />
                   {notifications.length > 0 && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-1 -right-1 size-5 text-xs"
-                    >
-                      {notifications.length}
-                    </Badge>
+                    <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums ring-2 ring-background">
+                      {notifications.length > 9 ? '9+' : notifications.length}
+                    </span>
                   )}
                 </Button>
               </DropdownMenuTrigger>
@@ -684,13 +659,12 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-1 ml-2">
-                              <Badge 
+                              <Badge
                                 variant={
                                   notification.priority === 'urgent' ? 'destructive' :
-                                  notification.priority === 'high' ? 'default' : 
-                                  notification.priority === 'medium' ? 'secondary' : 'outline'
+                                  notification.priority === 'high' ? 'warning' :
+                                  notification.priority === 'medium' ? 'info' : 'soft'
                                 }
-                                className="text-xs"
                               >
                                 {notification.priority}
                               </Badge>
@@ -731,7 +705,7 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
           </div>
         </header>
         
-        <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="custom-scrollbar flex flex-1 flex-col gap-6 overflow-y-auto p-6 lg:p-8">
           {children}
         </div>
       </SidebarInset>

@@ -6,6 +6,15 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+/** CHECK en public.dropi_orders.status_bucket */
+export type DropiStatusBucket =
+  | "cancelled"
+  | "delivered"
+  | "return_flow"
+  | "issue"
+  | "in_transit"
+  | "pending"
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -105,6 +114,7 @@ export type Database = {
           updated_at?: string | null
           last_active_at?: string | null
         }
+        Relationships: []
       }
       users: {
         Row: {
@@ -134,6 +144,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       shops: {
         Row: {
@@ -184,6 +195,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
+        Relationships: []
       }
       orders: {
         Row: {
@@ -237,6 +249,7 @@ export type Database = {
           shop_id?: string
           customer_id?: string | null
         }
+        Relationships: []
       }
       products: {
         Row: {
@@ -281,6 +294,7 @@ export type Database = {
           updated_at?: string
           shop_id?: string
         }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -322,6 +336,7 @@ export type Database = {
           updated_at?: string
           shop_id?: string
         }
+        Relationships: []
       }
       conversations: {
         Row: {
@@ -360,6 +375,7 @@ export type Database = {
           shop_id?: string
           order_id?: string | null
         }
+        Relationships: []
       }
       messages: {
         Row: {
@@ -395,6 +411,7 @@ export type Database = {
           created_at?: string
           conversation_id?: string
         }
+        Relationships: []
       }
       refresh_tokens: {
         Row: {
@@ -421,6 +438,7 @@ export type Database = {
           created_at?: string
           user_id?: string
         }
+        Relationships: []
       }
       webhook_logs: {
         Row: {
@@ -453,6 +471,7 @@ export type Database = {
           created_at?: string
           user_id?: string
         }
+        Relationships: []
       }
       dropi_meta_spend_snapshots: {
         Row: {
@@ -479,6 +498,7 @@ export type Database = {
           meta_ad_spend?: number
           updated_at?: string
         }
+        Relationships: []
       }
       dropi_order_imports: {
         Row: {
@@ -502,6 +522,7 @@ export type Database = {
           row_count?: number
           created_at?: string
         }
+        Relationships: []
       }
       dropi_orders: {
         Row: {
@@ -516,7 +537,7 @@ export type Database = {
           customer_phone: string | null
           customer_email: string | null
           status_raw: string
-          status_bucket: string
+          status_bucket: DropiStatusBucket
           department: string | null
           city: string | null
           address: string | null
@@ -551,7 +572,7 @@ export type Database = {
           customer_phone?: string | null
           customer_email?: string | null
           status_raw: string
-          status_bucket: string
+          status_bucket: DropiStatusBucket
           department?: string | null
           city?: string | null
           address?: string | null
@@ -586,7 +607,7 @@ export type Database = {
           customer_phone?: string | null
           customer_email?: string | null
           status_raw?: string
-          status_bucket?: string
+          status_bucket?: DropiStatusBucket
           department?: string | null
           city?: string | null
           address?: string | null
@@ -609,6 +630,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
     }
     Views: {

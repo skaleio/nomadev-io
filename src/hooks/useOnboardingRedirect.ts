@@ -27,20 +27,20 @@ export const useOnboardingRedirect = () => {
       }
 
       try {
-        // Verificar si el usuario ya tiene una tienda conectada
-        const { data: shops, error } = await supabase
-          .from('shops')
-          .select('id, is_active')
+        // Verificar si el usuario ya tiene una conexión de Shopify activa
+        const { data: connections, error } = await supabase
+          .from('shopify_connections')
+          .select('id')
           .eq('user_id', user.id)
           .eq('is_active', true);
 
         if (error) {
-          console.error('Error verificando tiendas:', error);
+          console.error('Error verificando conexiones:', error);
           return;
         }
 
-        // Si no tiene tiendas activas, redirigir al onboarding
-        if (!shops || shops.length === 0) {
+        // Si no tiene conexiones activas, redirigir al onboarding
+        if (!connections || connections.length === 0) {
           const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
           
           if (!hasSeenOnboarding) {

@@ -159,6 +159,20 @@ serve(async (req) => {
   }
 
   try {
+    // Validate JWT — every action requires an authenticated user
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    )
+    const { data: { user } } = await supabaseAuth.auth.getUser()
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'No autorizado' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -167,20 +181,11 @@ serve(async (req) => {
     const url = new URL(req.url)
     const action = url.searchParams.get('action') || 'process'
 
-    // GET /batch-message-worker?action=process&user_id=xxx&batch_size=10
+    // GET /batch-message-worker?action=process&batch_size=10
     if (action === 'process') {
-      const userId = url.searchParams.get('user_id')
+      // user_id is always the authenticated user — ignore any user_id param to prevent spoofing
+      const userId = user.id
       const batchSize = parseInt(url.searchParams.get('batch_size') || '10')
-
-      if (!userId) {
-        return new Response(
-          JSON.stringify({ error: 'user_id is required' }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
 
       const result = await processBatch(userId, batchSize, supabaseClient)
 
@@ -264,17 +269,12 @@ serve(async (req) => {
     }
 
     // GET /batch-message-worker?action=stats
-    // Obtener estadísticas de la cola
+    // Obtener estadísticas de la cola (siempre scoped al usuario autenticado)
     if (action === 'stats') {
-      const userId = url.searchParams.get('user_id')
-
       let query = supabaseClient
         .from('message_queue')
         .select('status')
-
-      if (userId) {
-        query = query.eq('user_id', userId)
-      }
+        .eq('user_id', user.id)
 
       const { data: messages } = await query
 

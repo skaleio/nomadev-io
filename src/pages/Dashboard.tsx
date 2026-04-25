@@ -115,44 +115,49 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">¡Bienvenido a NOMADEV!</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Centro de control de tus pedidos COD y rentabilidad. Últimos 30 días: {range.from} → {range.to}
-              </p>
-            </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Bienvenido a Nomadev
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Centro de control de pedidos COD y rentabilidad · Últimos 30 días{' '}
+              <span className="font-medium text-foreground/80 tabular-nums">
+                {range.from} → {range.to}
+              </span>
+            </p>
           </div>
-          <Badge
-            variant="secondary"
-            className="bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700"
-          >
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Sistema Activo
+          <Badge variant="success">
+            <CheckCircle className="size-3" />
+            Sistema activo
           </Badge>
         </div>
 
         {!hasData && !loadingDropi && (
-          <Card className="border-dashed">
-            <CardContent className="p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  Empieza importando tus pedidos Dropi
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                  Sube el .xlsx de Dropi y registra tu gasto en Meta del periodo. Dashboard, ROAS, CPA y precio
-                  sugerido se calculan al instante.
-                </p>
+          <Card className="border-dashed border-primary/30 bg-primary/[0.03]">
+            <CardContent className="flex flex-col items-start justify-between gap-4 p-6 md:flex-row md:items-center">
+              <div className="flex items-start gap-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+                  <Package className="size-5" strokeWidth={1.75} />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold tracking-tight text-foreground">
+                    Empieza importando tus pedidos Dropi
+                  </h3>
+                  <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                    Sube el .xlsx de Dropi y registra tu gasto en Meta del periodo. Dashboard, ROAS,
+                    CPA y precio sugerido se calculan al instante.
+                  </p>
+                </div>
               </div>
               <Button onClick={() => navigate('/orders')}>
-                <Package className="w-4 h-4 mr-2" /> Ir a Gestión de Pedidos
+                Ir a Gestión de Pedidos
               </Button>
             </CardContent>
           </Card>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Total pedidos (30d)"
             value={String(metrics.totalPedidos)}
@@ -185,12 +190,12 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="ROAS real"
             value={formatRoas(metrics.roasReal)}
             icon={TrendingUp}
-            color="primary"
+            color="info"
             description="Ganancia real / ads"
             loading={loadingDropi}
           />
@@ -198,7 +203,7 @@ export default function Dashboard() {
             title="CPA"
             value={metrics.cpa != null ? formatMoney(metrics.cpa) : '—'}
             icon={Shield}
-            color="primary"
+            color="info"
             description="Coste por pedido entregado"
             loading={loadingDropi}
           />
@@ -206,7 +211,7 @@ export default function Dashboard() {
             title="AOV"
             value={formatMoney(metrics.aov)}
             icon={DollarSign}
-            color="primary"
+            color="info"
             description="Ticket promedio"
             loading={loadingDropi}
           />
@@ -214,7 +219,7 @@ export default function Dashboard() {
             title="Top región (entregados)"
             value={metrics.topRegionEntregados?.label ?? '—'}
             icon={MapPin}
-            color="primary"
+            color="info"
             description={
               metrics.topRegionEntregados
                 ? `${metrics.topRegionEntregados.count} entregados`
@@ -224,135 +229,105 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Activity className="w-5 h-5 text-emerald-600" />
-                <span>Estado del Sistema</span>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="size-4 text-success" strokeWidth={2} />
+                Estado del sistema
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Importador Dropi</span>
-                  <Badge
-                    variant="default"
-                    className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
-                  >
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Activo
+            <CardContent className="space-y-3">
+              {[
+                { label: 'Importador Dropi', status: 'Activo' },
+                { label: 'Métricas COD (Meta + Dropi)', status: 'Activo' },
+                { label: 'Base de datos', status: 'Online' },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/30 px-3 py-2"
+                >
+                  <span className="text-sm text-foreground/90">{item.label}</span>
+                  <Badge variant="success">
+                    <CheckCircle className="size-3" />
+                    {item.status}
                   </Badge>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Métricas COD (Meta + Dropi)</span>
-                  <Badge
-                    variant="default"
-                    className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
-                  >
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Activo
-                  </Badge>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Base de Datos</span>
-                  <Badge
-                    variant="default"
-                    className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
-                  >
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Online
-                  </Badge>
-                </div>
-              </div>
+              ))}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Activity className="w-5 h-5 text-blue-600" />
-                <span>Acciones Rápidas</span>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="size-4 text-primary" strokeWidth={2} />
+                Acciones rápidas
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Button
                   className="w-full justify-start"
                   variant="outline"
+                  size="sm"
                   onClick={() => navigate('/orders')}
                 >
-                  <Package className="w-4 h-4 mr-2" />
-                  Importar pedidos Dropi
+                  <Package className="size-4" />
+                  Importar pedidos
                 </Button>
                 <Button
                   className="w-full justify-start"
                   variant="outline"
+                  size="sm"
                   onClick={() => navigate('/settings')}
                 >
-                  <Shield className="w-4 h-4 mr-2" />
+                  <Shield className="size-4" />
                   Configuración
                 </Button>
-                <Button
-                  className="w-full justify-start opacity-70"
-                  variant="outline"
-                  onClick={() =>
-                    showLockedToast('Chat en Vivo', 'Chat omnicanal en beta privada.')
-                  }
-                >
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Chat en Vivo
-                  <Lock className="w-3 h-3 ml-auto text-amber-500" />
-                </Button>
-                <Button
-                  className="w-full justify-start opacity-70"
-                  variant="outline"
-                  onClick={() =>
-                    showLockedToast(
-                      'Validador de Clientes',
-                      'Validación con IA en pruebas privadas.',
-                    )
-                  }
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Validar Clientes
-                  <Lock className="w-3 h-3 ml-auto text-amber-500" />
-                </Button>
-                <Button
-                  className="w-full justify-start opacity-70"
-                  variant="outline"
-                  onClick={() =>
-                    showLockedToast(
-                      'Shopify Analytics',
-                      'Dashboard nativo Shopify llega muy pronto.',
-                    )
-                  }
-                >
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Shopify Analytics
-                  <Lock className="w-3 h-3 ml-auto text-amber-500" />
-                </Button>
-                <Button
-                  className="w-full justify-start opacity-70"
-                  variant="outline"
-                  onClick={() =>
-                    showLockedToast('Gestor de Leads', 'Pipeline con scoring automático en construcción.')
-                  }
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Gestor de Leads
-                  <Lock className="w-3 h-3 ml-auto text-amber-500" />
-                </Button>
+                {[
+                  {
+                    icon: MessageSquare,
+                    label: 'Chat en Vivo',
+                    note: 'Chat omnicanal en beta privada.',
+                  },
+                  {
+                    icon: CheckCircle,
+                    label: 'Validar Clientes',
+                    note: 'Validación con IA en pruebas privadas.',
+                  },
+                  {
+                    icon: ShoppingCart,
+                    label: 'Shopify Analytics',
+                    note: 'Dashboard nativo Shopify llega muy pronto.',
+                  },
+                  {
+                    icon: Users,
+                    label: 'Gestor de Leads',
+                    note: 'Pipeline con scoring automático en construcción.',
+                  },
+                ].map((s) => (
+                  <Button
+                    key={s.label}
+                    className="w-full justify-start text-muted-foreground"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => showLockedToast(s.label, s.note)}
+                  >
+                    <s.icon className="size-4" />
+                    <span className="flex-1 text-left">{s.label}</span>
+                    <Lock className="size-3 text-warning" />
+                  </Button>
+                ))}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="bg-gradient-to-br from-emerald-500/5 via-transparent to-blue-500/5 border-emerald-500/20">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-emerald-500" />
-              Próximamente en NOMADEV
+              <Sparkles className="size-4 text-primary" strokeWidth={2} />
+              Próximamente en Nomadev
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               Estamos desplegando estas herramientas para tu cuenta. Tus pedidos Dropi se beneficiarán
@@ -360,20 +335,23 @@ export default function Dashboard() {
             </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {lockedShortcuts.map((s) => (
                 <button
                   key={s.label}
                   type="button"
                   onClick={() => showLockedToast(s.label, s.note)}
-                  className="text-left rounded-xl border border-dashed border-emerald-500/30 bg-background/40 p-4 hover:bg-background/70 transition-colors relative"
+                  className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-4 text-left transition-all duration-base ease-standard hover:border-primary/30 hover:bg-primary/[0.03] hover:shadow-elev-1"
                 >
-                  <div className="absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold text-amber-500/90 bg-amber-500/10 border border-amber-500/30 rounded-full px-2 py-0.5">
-                    <Lock className="w-3 h-3" /> Pronto
+                  <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
+                    <Lock className="size-2.5" />
+                    Soon
                   </div>
-                  <s.icon className="w-6 h-6 text-emerald-500 mb-2" />
-                  <div className="font-semibold text-foreground">{s.label}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{s.note}</div>
+                  <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/20 transition-transform duration-base group-hover:scale-105">
+                    <s.icon className="size-[18px]" strokeWidth={1.75} />
+                  </div>
+                  <div className="text-sm font-semibold tracking-tight text-foreground">{s.label}</div>
+                  <div className="mt-1 text-xs text-muted-foreground leading-relaxed">{s.note}</div>
                 </button>
               ))}
             </div>

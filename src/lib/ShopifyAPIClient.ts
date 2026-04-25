@@ -252,22 +252,22 @@ export class ShopifyAPIClient {
   }
 }
 
-// Función helper para obtener el cliente para un usuario específico
+// Función helper para obtener el cliente a partir de una conexión OAuth activa en shopify_connections
 export async function getShopifyClient(userId: string): Promise<ShopifyAPIClient | null> {
   try {
-    const { data: shop, error } = await supabase
-      .from('shops')
-      .select('shopify_domain, shopify_access_token')
+    const { data: conn, error } = await supabase
+      .from('shopify_connections')
+      .select('shop_domain, access_token')
       .eq('user_id', userId)
       .eq('is_active', true)
       .single();
 
-    if (error || !shop) {
-      console.log('No se encontró tienda activa para el usuario:', userId);
+    if (error || !conn) {
+      console.log('No se encontró conexión Shopify activa para el usuario:', userId);
       return null;
     }
 
-    return new ShopifyAPIClient(shop.shopify_domain, shop.shopify_access_token);
+    return new ShopifyAPIClient(conn.shop_domain, conn.access_token);
   } catch (error) {
     console.error('Error creando cliente Shopify:', error);
     return null;

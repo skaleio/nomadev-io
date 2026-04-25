@@ -16,7 +16,6 @@ import {
   computeDailyProfitTrend,
   computeDropiMetrics,
   computeMetricsByCarrier,
-  computeMetricsByRegion,
   computeTopProductInsight,
   detectDateRange,
   filterDropiOrders,
@@ -37,7 +36,20 @@ import {
   Megaphone,
   Scale,
   Truck,
+  Check,
+  Filter,
+  Search,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { regionChartColor } from "@/lib/regionChartColors";
 import { toast } from "sonner";
 import {
   Bar,
@@ -73,12 +85,8 @@ function isoLocal(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function minIso(a: string, b: string): string {
-  return a <= b ? a : b;
-}
-function maxIso(a: string, b: string): string {
-  return a >= b ? a : b;
-}
+function minIso(a: string, b: string): string { return a <= b ? a : b; }
+function maxIso(a: string, b: string): string { return a >= b ? a : b; }
 
 const BUCKET_LABEL: Record<string, string> = {
   cancelled: "Cancelado",
@@ -89,20 +97,16 @@ const BUCKET_LABEL: Record<string, string> = {
   pending: "Pendiente",
 };
 
-function bucketBadgeClass(bucket: string) {
+type BucketVariant = "success" | "destructive" | "warning" | "info" | "soft";
+
+function bucketVariant(bucket: string): BucketVariant {
   switch (bucket) {
-    case "delivered":
-      return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
-    case "cancelled":
-      return "bg-red-500/20 text-red-400 border-red-500/30";
-    case "issue":
-      return "bg-amber-500/20 text-amber-400 border-amber-500/30";
-    case "return_flow":
-      return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-    case "pending":
-      return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-    default:
-      return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+    case "delivered":   return "success";
+    case "cancelled":   return "destructive";
+    case "issue":       return "warning";
+    case "return_flow": return "warning";
+    case "pending":     return "soft";
+    default:            return "info";
   }
 }
 
@@ -121,7 +125,8 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [importing, setImporting] = useState(false);
   const [chartPeriodDays, setChartPeriodDays] = useState<1 | 7 | 14 | 30>(30);
   const [vizRegion, setVizRegion] = useState<string | null>(null);
-  const [showRegionGrid, setShowRegionGrid] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [clientQuery, setClientQuery] = useState("");
   const [postImport, setPostImport] = useState<{
     open: boolean;
     detectedFrom: string;
@@ -139,16 +144,13 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     const chartTo = isoLocal(today);
     const start = new Date(today);
     start.setDate(start.getDate() - (chartPeriodDays - 1));
-    const chartFrom = isoLocal(start);
-    return { chartFrom, chartTo };
+    return { chartFrom: isoLocal(start), chartTo };
   }, [chartPeriodDays]);
 
-  const fetchBounds = useMemo(() => {
-    return {
-      from: minIso(dateFrom, chartBounds.chartFrom),
-      to: maxIso(dateTo, chartBounds.chartTo),
-    };
-  }, [dateFrom, dateTo, chartBounds.chartFrom, chartBounds.chartTo]);
+  const fetchBounds = useMemo(() => ({
+    from: minIso(dateFrom, chartBounds.chartFrom),
+    to: maxIso(dateTo, chartBounds.chartTo),
+  }), [dateFrom, dateTo, chartBounds.chartFrom, chartBounds.chartTo]);
 
   const loadOrders = useCallback(async () => {
     if (!userId) return;
@@ -161,12 +163,11 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         .gte("order_date", fetchBounds.from)
         .lte("order_date", fetchBounds.to)
         .order("order_date", { ascending: false });
-
       if (error) throw error;
       setOrders(data ?? []);
     } catch (e) {
       console.error(e);
-      toast.error(e instanceof Error ? e.message : "No se pudieron cargar los pedidos Dropi");
+      toast.error(e instanceof Error ? e.message : "No se pudieron cargar los pedidos");
       setOrders([]);
     } finally {
       setLoading(false);
@@ -182,21 +183,13 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       .eq("period_start", dateFrom)
       .eq("period_end", dateTo)
       .maybeSingle();
-    if (error) {
-      console.warn(error);
-      return;
-    }
-    if (data?.meta_ad_spend != null) setMetaInput(String(data.meta_ad_spend));
-    else setMetaInput("");
+    if (error) { console.warn(error); return; }
+    const spend = data?.meta_ad_spend;
+    setMetaInput(spend != null ? String(spend) : "");
   }, [userId, dateFrom, dateTo]);
 
-  useEffect(() => {
-    void loadOrders();
-  }, [loadOrders]);
-
-  useEffect(() => {
-    void loadMetaSnapshot();
-  }, [loadMetaSnapshot]);
+  useEffect(() => { void loadOrders(); }, [loadOrders]);
+  useEffect(() => { void loadMetaSnapshot(); }, [loadMetaSnapshot]);
 
   const ordersInMainRange = useMemo(
     () => orders.filter((o) => o.order_date >= dateFrom && o.order_date <= dateTo),
@@ -208,37 +201,88 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     [orders, chartBounds.chartFrom, chartBounds.chartTo],
   );
 
-  const regionOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const o of ordersInMainRange) {
-      set.add(
-        (o.department ?? "").trim() ||
-          (o.city ?? "").trim() ||
-          "Sin región",
-      );
-    }
-    return ["all", ...[...set].sort((a, b) => a.localeCompare(b, "es"))];
-  }, [ordersInMainRange]);
+  /** Pedidos del rango principal con filtros de producto y logística (sin filtro de región) — base del selector y conteos. */
+  const regionFilterRows = useMemo(
+    () => filterDropiOrders(ordersInMainRange, { region: "all", product, carrier }),
+    [ordersInMainRange, product, carrier],
+  );
 
-  const productOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const o of ordersInMainRange) {
-      const c = (o.categories ?? "").trim() || "Sin categoría";
-      set.add(c);
+  const regionFilterOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const o of regionFilterRows) {
+      const k = regionKey(o);
+      map.set(k, (map.get(k) ?? 0) + 1);
     }
-    return ["all", ...[...set].sort((a, b) => a.localeCompare(b, "es"))];
-  }, [ordersInMainRange]);
+    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"));
+    return [
+      { value: "all" as const, label: "Todas las regiones", count: regionFilterRows.length },
+      ...sorted.map(([name, count]) => ({ value: name, label: name, count })),
+    ];
+  }, [regionFilterRows]);
 
-  const carrierOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const o of ordersInMainRange) set.add(carrierKey(o));
-    return ["all", ...[...set].sort((a, b) => a.localeCompare(b, "es"))];
-  }, [ordersInMainRange]);
+  const productFilterRows = useMemo(
+    () => filterDropiOrders(ordersInMainRange, { region, product: "all", carrier }),
+    [ordersInMainRange, region, carrier],
+  );
+
+  const productFilterOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const o of productFilterRows) {
+      const k = (o.categories ?? "").trim() || "Sin categoría";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"));
+    return [
+      { value: "all" as const, label: "Todos los productos", count: productFilterRows.length },
+      ...sorted.map(([name, count]) => ({ value: name, label: name, count })),
+    ];
+  }, [productFilterRows]);
+
+  const carrierFilterRows = useMemo(
+    () => filterDropiOrders(ordersInMainRange, { region, product, carrier: "all" }),
+    [ordersInMainRange, region, product],
+  );
+
+  const carrierFilterOptions = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const o of carrierFilterRows) {
+      const k = carrierKey(o);
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    const sorted = [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"));
+    return [
+      { value: "all" as const, label: "Todas las logísticas", count: carrierFilterRows.length },
+      ...sorted.map(([name, count]) => ({ value: name, label: name, count })),
+    ];
+  }, [carrierFilterRows]);
 
   const filteredForMetrics = useMemo(
     () => filterDropiOrders(ordersInMainRange, filters),
     [ordersInMainRange, filters],
   );
+
+  const ordersListFiltered = useMemo(() => {
+    const q = clientQuery.trim().toLowerCase();
+    if (!q) return filteredForMetrics;
+    return filteredForMetrics.filter((o) => {
+      const blob = [
+        o.customer_name,
+        o.customer_phone,
+        o.customer_email,
+        o.address,
+        String(o.dropi_numeric_id),
+        o.guide_number,
+        o.shop_order_number,
+        regionKey(o),
+        carrierKey(o),
+        (o.categories ?? ""),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return blob.includes(q);
+    });
+  }, [filteredForMetrics, clientQuery]);
 
   const ordersChartProductOnly = useMemo(
     () => filterDropiOrders(ordersForChartWindow, { region: "all", product, carrier }),
@@ -283,11 +327,6 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     return computeTopProductInsight(ordersInMainRange, filters, label, metaSpend);
   }, [ordersInMainRange, filters, metaSpend, metrics.topProducto?.label]);
 
-  const regionBreakdown = useMemo(() => {
-    const base = filterDropiOrders(ordersInMainRange, { region: "all", product, carrier });
-    return computeMetricsByRegion(base, metaSpend);
-  }, [ordersInMainRange, product, carrier, metaSpend]);
-
   const carrierBreakdown = useMemo(() => {
     const base = filterDropiOrders(ordersInMainRange, { region, product, carrier: "all" });
     return computeMetricsByCarrier(base, metaSpend);
@@ -297,12 +336,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     if (!userId) return;
     try {
       const { error } = await supabase.from("dropi_meta_spend_snapshots").upsert(
-        {
-          user_id: userId,
-          period_start: dateFrom,
-          period_end: dateTo,
-          meta_ad_spend: metaSpend,
-        },
+        { user_id: userId, period_start: dateFrom, period_end: dateTo, meta_ad_spend: metaSpend },
         { onConflict: "user_id,period_start,period_end" },
       );
       if (error) throw error;
@@ -317,41 +351,29 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     e.target.value = "";
     if (!file || !userId) return;
     if (!file.name.toLowerCase().endsWith(".xlsx")) {
-      toast.error("Usa un archivo .xlsx de Dropi");
+      toast.error("Formato no admitido. Usa un archivo Excel de exportación de guías.");
       return;
     }
     setImporting(true);
     try {
       const buf = await file.arrayBuffer();
       const parsed = parseDropiXlsxArrayBuffer(buf);
-      if (!parsed.length) {
-        toast.error("No se encontraron filas válidas (revisa ID y FECHA)");
-        return;
-      }
+      if (!parsed.length) { toast.error("No se encontraron filas válidas (revisa ID y FECHA)"); return; }
 
       const detected = detectDateRange(parsed.map((p) => p.order_date));
-      if (!detected) {
-        toast.error("No pudimos detectar fechas válidas en el archivo");
-        return;
-      }
+      if (!detected) { toast.error("No pudimos detectar fechas válidas en el archivo"); return; }
 
       const { data: imp, error: impErr } = await supabase
         .from("dropi_order_imports")
-        .insert({
-          user_id: userId,
-          source_filename: file.name,
-          row_count: parsed.length,
-        })
+        .insert({ user_id: userId, source_filename: file.name, row_count: parsed.length })
         .select("id")
         .single();
 
       if (impErr || !imp) throw impErr ?? new Error("Import batch");
 
       const rows = toSupabaseInsertRows(userId, imp.id, parsed);
-      const chunk = 120;
-      for (let i = 0; i < rows.length; i += chunk) {
-        const part = rows.slice(i, i + chunk);
-        const { error: upErr } = await supabase.from("dropi_orders").upsert(part, {
+      for (let i = 0; i < rows.length; i += 120) {
+        const { error: upErr } = await supabase.from("dropi_orders").upsert(rows.slice(i, i + 120), {
           onConflict: "user_id,dropi_numeric_id",
         });
         if (upErr) throw upErr;
@@ -386,10 +408,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const confirmPostImport = async () => {
     if (!postImport || !userId) return;
     const { rangeFrom, rangeTo, metaInput: pmInput, rowsImported } = postImport;
-    if (!rangeFrom || !rangeTo || rangeFrom > rangeTo) {
-      toast.error("Rango de fechas inválido");
-      return;
-    }
+    if (!rangeFrom || !rangeTo || rangeFrom > rangeTo) { toast.error("Rango de fechas inválido"); return; }
     const metaValue = Number(String(pmInput).replace(/\s/g, "").replace(",", "."));
     if (!Number.isFinite(metaValue) || metaValue < 0) {
       toast.error("Indica el gasto en Meta para este rango (0 si no invertiste)");
@@ -397,12 +416,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     }
     try {
       const { error } = await supabase.from("dropi_meta_spend_snapshots").upsert(
-        {
-          user_id: userId,
-          period_start: rangeFrom,
-          period_end: rangeTo,
-          meta_ad_spend: metaValue,
-        },
+        { user_id: userId, period_start: rangeFrom, period_end: rangeTo, meta_ad_spend: metaValue },
         { onConflict: "user_id,period_start,period_end" },
       );
       if (error) throw error;
@@ -418,8 +432,8 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
   if (!userId) {
     return (
-      <Card className="bg-gray-900/50 border-gray-700">
-        <CardContent className="p-6 text-gray-400">Inicia sesión para importar pedidos Dropi.</CardContent>
+      <Card>
+        <CardContent className="p-6 text-muted-foreground">Inicia sesión para importar pedidos.</CardContent>
       </Card>
     );
   }
@@ -428,296 +442,140 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const c = metrics.counts;
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}%` : "0%");
 
+  /* ── chart theme ── */
+  const chartTheme = {
+    grid: "hsl(var(--border))",
+    tick: "hsl(var(--muted-foreground))",
+    tooltip: {
+      contentStyle: { backgroundColor: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "8px" },
+      labelStyle: { color: "hsl(var(--foreground))", fontWeight: 500 },
+    },
+    success: "hsl(var(--success))",
+    primary: "hsl(var(--primary))",
+    muted: "hsl(var(--muted-foreground))",
+  };
+
+  const dimensionFilterActive =
+    (region !== "all" ? 1 : 0) + (product !== "all" ? 1 : 0) + (carrier !== "all" ? 1 : 0);
+
   return (
     <div className="space-y-6">
-      <Card className="bg-gray-900/50 border-gray-700">
+      {/* ── Importar ── */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2 text-lg">
-            <Upload className="w-5 h-5" />
-            Importar guías Dropi (.xlsx)
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="size-4" strokeWidth={2} />
+            Importar guías de pedidos
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4 items-end">
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Desde (FECHA pedido)</label>
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))}
-              className="bg-gray-800 border-gray-600 text-white w-40"
-            />
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Desde (FECHA pedido)</label>
+            <Input type="date" value={dateFrom} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="w-40" />
           </div>
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Hasta</label>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))}
-              className="bg-gray-800 border-gray-600 text-white w-40"
-            />
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Hasta</label>
+            <Input type="date" value={dateTo} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="w-40" />
           </div>
+          <p className="text-xs text-muted-foreground max-w-md pb-1">
+            Región, producto y logística se ajustan desde <span className="font-medium text-foreground/90">Filtros</span> en la lista de pedidos.
+          </p>
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Región (departamento)</label>
-            <select
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm min-w-[200px]"
-            >
-              {regionOptions.map((r) => (
-                <option key={r} value={r}>
-                  {r === "all" ? "Todas las regiones" : r}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Producto / categoría</label>
-            <select
-              value={product}
-              onChange={(e) => setProduct(e.target.value)}
-              className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm min-w-[220px]"
-            >
-              {productOptions.map((p) => (
-                <option key={p} value={p}>
-                  {p === "all" ? "Todos los productos" : p}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Logística (transportadora)</label>
-            <select
-              value={carrier}
-              onChange={(e) => setCarrier(e.target.value)}
-              className="px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white text-sm min-w-[200px]"
-            >
-              {carrierOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c === "all" ? "Todas las logísticas" : c}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 block mb-1">Archivo</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Archivo</label>
             <Input
               type="file"
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(e) => void onFile(e)}
               disabled={importing}
-              className="bg-gray-800 border-gray-600 text-white max-w-xs"
+              className="max-w-xs"
             />
           </div>
           <Button variant="outline" size="sm" onClick={() => void loadOrders()} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
             Recargar
           </Button>
         </CardContent>
       </Card>
 
-      <Card className="bg-gray-900/50 border-gray-700">
+      {/* ── Meta spend ── */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white text-lg flex items-center gap-2">
-            <Megaphone className="w-5 h-5" />
+          <CardTitle className="flex items-center gap-2">
+            <Megaphone className="size-4" strokeWidth={2} />
             Inversión Meta (gasto en ads)
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="text-xs text-gray-400 block mb-1">Monto CLP (este rango de fechas)</label>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Monto CLP (este rango de fechas)</label>
             <Input
               type="text"
               inputMode="decimal"
               placeholder="Ej: 270000"
               value={metaInput}
               onChange={(e) => setMetaInput(e.target.value)}
-              className="bg-gray-800 border-gray-600 text-white w-48"
+              className="w-48"
             />
           </div>
-          <Button size="sm" variant="secondary" onClick={() => void saveMetaSpend()}>
+          <Button size="sm" onClick={() => void saveMetaSpend()}>
             Guardar gasto
           </Button>
-          <p className="text-xs text-gray-500 max-w-xl">
-            ROAS y CPA usan este monto. No viene en el Excel de Dropi; lo guardamos por rango para que las métricas
-            sean reproducibles.
+          <p className="text-xs text-muted-foreground max-w-xl">
+            ROAS y CPA usan este monto. No viene en el archivo de importación; lo guardamos por rango para que las métricas sean reproducibles.
           </p>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <MetricCard
-          title="Total vendido"
-          value={formatMoney(metrics.totalVendido)}
-          icon={DollarSign}
-          color="primary"
-          description="Suma valor compra productos, excl. cancelados / anulados"
-          loading={loading}
-        />
-        <MetricCard
-          title="Facturación confirmados"
-          value={formatMoney(metrics.facturacionConfirmados)}
-          icon={BarChart3}
-          color="primary"
-          description="Solo filas con factura o valor facturado (si el export viene vacío, 0)"
-          loading={loading}
-        />
-        <MetricCard
-          title="Ganancia real"
-          value={formatMoney(metrics.gananciaReal)}
-          icon={TrendingUp}
-          color="success"
-          description="Suma GANANCIA solo pedidos entregados"
-          loading={loading}
-        />
-        <MetricCard
-          title="Ganancia estimada"
-          value={formatMoney(metrics.gananciaEstimada)}
-          icon={TrendingUp}
-          color="warning"
-          description="Suma GANANCIA en todos los no cancelados"
-          loading={loading}
-        />
-        <MetricCard
-          title="Ganancia promedio"
-          value={formatMoney(metrics.gananciaPromedioEntregado)}
-          icon={Target}
-          color="primary"
-          description="Por pedido entregado"
-          loading={loading}
-        />
+      {/* ── Métricas principales ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <MetricCard title="Total vendido" value={formatMoney(metrics.totalVendido)} icon={DollarSign} color="primary" description="Suma valor compra productos, excl. cancelados / anulados" loading={loading} />
+        <MetricCard title="Facturación confirmados" value={formatMoney(metrics.facturacionConfirmados)} icon={BarChart3} color="info" description="Solo filas con factura o valor facturado" loading={loading} />
+        <MetricCard title="Ganancia real" value={formatMoney(metrics.gananciaReal)} icon={TrendingUp} color="success" description="Suma GANANCIA solo pedidos entregados" loading={loading} />
+        <MetricCard title="Ganancia estimada" value={formatMoney(metrics.gananciaEstimada)} icon={TrendingUp} color="warning" description="Suma GANANCIA en todos los no cancelados" loading={loading} />
+        <MetricCard title="Ganancia promedio" value={formatMoney(metrics.gananciaPromedioEntregado)} icon={Target} color="primary" description="Por pedido entregado" loading={loading} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard
-          title="Inversión Meta"
-          value={formatMoney(metrics.inversionMeta)}
-          icon={Megaphone}
-          color="warning"
-          description="Gasto en ads (manual)"
-          loading={loading}
-        />
-        <MetricCard
-          title="ROAS facturación"
-          value={formatRoas(metrics.roasFacturacion)}
-          icon={BarChart3}
-          color="primary"
-          description="Facturación confirmados / ads"
-          loading={loading}
-        />
-        <MetricCard
-          title="ROAS real"
-          value={formatRoas(metrics.roasReal)}
-          icon={TrendingUp}
-          color="success"
-          description="Ganancia real / ads"
-          loading={loading}
-        />
-        <MetricCard
-          title="CPA"
-          value={
-            metrics.cpa != null ? formatMoney(metrics.cpa) : "—"
-          }
-          icon={Target}
-          color="primary"
-          description="Ads / pedidos entregados"
-          loading={loading}
-        />
-        <MetricCard
-          title="AOV"
-          value={formatMoney(metrics.aov)}
-          icon={Package}
-          color="primary"
-          description="Ticket promedio (total vendido / pedidos no cancelados)"
-          loading={loading}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <MetricCard title="Inversión Meta" value={formatMoney(metrics.inversionMeta)} icon={Megaphone} color="warning" description="Gasto en ads (manual)" loading={loading} />
+        <MetricCard title="ROAS facturación" value={formatRoas(metrics.roasFacturacion)} icon={BarChart3} color="info" description="Facturación confirmados / ads" loading={loading} />
+        <MetricCard title="ROAS real" value={formatRoas(metrics.roasReal)} icon={TrendingUp} color="success" description="Ganancia real / ads" loading={loading} />
+        <MetricCard title="CPA" value={metrics.cpa != null ? formatMoney(metrics.cpa) : "—"} icon={Target} color="primary" description="Ads / pedidos entregados" loading={loading} />
+        <MetricCard title="AOV" value={formatMoney(metrics.aov)} icon={Package} color="primary" description="Ticket promedio (total vendido / no cancelados)" loading={loading} />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <MetricCard title="Total pedidos" value={String(metrics.totalPedidos)} icon={Package} loading={loading} />
-        <MetricCard
-          title="Confirmados *"
-          value={`${c.confirmados} (${pct(c.confirmados)})`}
-          icon={BarChart3}
-          description="En tránsito / reparto (proxy operativo)"
-          loading={loading}
-        />
-        <MetricCard
-          title="Entregados"
-          value={`${c.entregados} (${pct(c.entregados)})`}
-          icon={TrendingUp}
-          color="success"
-          loading={loading}
-        />
-        <MetricCard
-          title="Pendientes"
-          value={`${c.pendientes} (${pct(c.pendientes)})`}
-          icon={Target}
-          loading={loading}
-        />
-        <MetricCard
-          title="Novedades"
-          value={`${c.novedades} (${pct(c.novedades)})`}
-          icon={BarChart3}
-          color="warning"
-          loading={loading}
-        />
-        <MetricCard
-          title="En devolución"
-          value={`${c.enDevolucion} (${pct(c.enDevolucion)})`}
-          icon={Package}
-          color="destructive"
-          loading={loading}
-        />
-        <MetricCard
-          title="Cancelados"
-          value={`${c.cancelados} (${pct(c.cancelados)})`}
-          icon={Package}
-          color="destructive"
-          loading={loading}
-        />
+        <MetricCard title="Confirmados *" value={`${c.confirmados} (${pct(c.confirmados)})`} icon={BarChart3} color="info" description="En tránsito / reparto" loading={loading} />
+        <MetricCard title="Entregados" value={`${c.entregados} (${pct(c.entregados)})`} icon={TrendingUp} color="success" loading={loading} />
+        <MetricCard title="Pendientes" value={`${c.pendientes} (${pct(c.pendientes)})`} icon={Target} loading={loading} />
+        <MetricCard title="Novedades" value={`${c.novedades} (${pct(c.novedades)})`} icon={BarChart3} color="warning" loading={loading} />
+        <MetricCard title="En devolución" value={`${c.enDevolucion} (${pct(c.enDevolucion)})`} icon={Package} color="destructive" loading={loading} />
+        <MetricCard title="Cancelados" value={`${c.cancelados} (${pct(c.cancelados)})`} icon={Package} color="destructive" loading={loading} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard
-          title="% Ganancia real"
-          value={`${metrics.pctGananciaReal}%`}
-          icon={Percent}
-          color="success"
-          description="Ganancia bruta sobre ventas de pedidos entregados"
-          loading={loading}
-        />
-        <MetricCard
-          title="% Ganancia estimada"
-          value={`${metrics.pctGananciaEstimada}%`}
-          icon={Percent}
-          color="warning"
-          description="Ganancia bruta sobre ventas de pedidos no cancelados"
-          loading={loading}
-        />
+        <MetricCard title="% Ganancia real" value={`${metrics.pctGananciaReal}%`} icon={Percent} color="success" description="Ganancia bruta sobre ventas de pedidos entregados" loading={loading} />
+        <MetricCard title="% Ganancia estimada" value={`${metrics.pctGananciaEstimada}%`} icon={Percent} color="warning" description="Ganancia bruta sobre ventas de pedidos no cancelados" loading={loading} />
         <MetricCard
           title="Top región entregados"
           value={metrics.topRegionEntregados?.label ?? "—"}
           icon={MapPin}
-          color="primary"
-          description={
-            metrics.topRegionEntregados
-              ? `${metrics.topRegionEntregados.count} entregados`
-              : "Sin entregados en el filtro"
-          }
+          color="info"
+          description={metrics.topRegionEntregados ? `${metrics.topRegionEntregados.count} entregados` : "Sin entregados en el filtro"}
           loading={loading}
         />
       </div>
 
-      <Card className="bg-gray-900/50 border-gray-700">
+      {/* ── Tendencia de ganancias ── */}
+      <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="text-white">Tendencia de ganancias</CardTitle>
+          <CardTitle>Tendencia de ganancias</CardTitle>
           <div className="flex flex-wrap gap-2">
             {([1, 7, 14, 30] as const).map((d) => (
               <Button
                 key={d}
                 size="sm"
-                variant={chartPeriodDays === d ? "secondary" : "outline"}
-                className={chartPeriodDays === d ? "bg-gray-700" : ""}
+                variant={chartPeriodDays === d ? "default" : "outline"}
                 onClick={() => setChartPeriodDays(d)}
               >
                 {d === 1 ? "Hoy" : `${d} días`}
@@ -725,71 +583,49 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
             ))}
           </div>
         </CardHeader>
-        <CardContent className="h-[320px] text-gray-300">
+        <CardContent className="h-[320px]">
           {profitTrend.length === 0 ? (
-            <p className="text-gray-500 text-sm py-12 text-center">Sin datos en este periodo del gráfico.</p>
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-muted-foreground">Sin datos en este periodo del gráfico.</p>
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={profitTrend.map((p) => ({
                   ...p,
-                  fecha: new Date(p.date + "T12:00:00").toLocaleDateString("es-CL", {
-                    day: "2-digit",
-                    month: "short",
-                  }),
+                  fecha: new Date(p.date + "T12:00:00").toLocaleDateString("es-CL", { day: "2-digit", month: "short" }),
                 }))}
                 margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="fecha" tick={{ fill: "#9ca3af", fontSize: 11 }} />
-                <YAxis
-                  tick={{ fill: "#9ca3af", fontSize: 11 }}
-                  tickFormatter={(v) => `${Math.round(v / 1000)}k`}
-                />
-                <Tooltip
-                  formatter={(value: number) => [formatMoney(value), ""]}
-                  contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #4b5563" }}
-                  labelStyle={{ color: "#e5e7eb" }}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.4} />
+                <XAxis dataKey="fecha" tick={{ fill: chartTheme.tick, fontSize: 11 }} />
+                <YAxis tick={{ fill: chartTheme.tick, fontSize: 11 }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                <Tooltip {...chartTheme.tooltip} formatter={(value: number) => [formatMoney(value), ""]} />
                 <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="gananciaReal"
-                  name="Ganancia real (entregados)"
-                  stroke="#34d399"
-                  strokeWidth={2}
-                  dot={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="gananciaEstimada"
-                  name="Ganancia estimada (no cancel.)"
-                  stroke="#60a5fa"
-                  strokeWidth={2}
-                  dot={false}
-                />
+                <Line type="monotone" dataKey="gananciaReal" name="Ganancia real (entregados)" stroke={chartTheme.success} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="gananciaEstimada" name="Ganancia estimada (no cancel.)" stroke={chartTheme.primary} strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           )}
-          <p className="text-xs text-gray-500 mt-2">
-            Periodo del gráfico: {chartBounds.chartFrom} → {chartBounds.chartTo} (según filtro de producto; todas las
-            regiones).
+          <p className="text-xs text-muted-foreground mt-2">
+            Periodo del gráfico: {chartBounds.chartFrom} → {chartBounds.chartTo}. Respeta el filtro de producto; las regiones se muestran todas en este gráfico.
           </p>
         </CardContent>
       </Card>
 
-      <Card className="bg-gray-900/50 border-gray-700">
+      {/* ── Pedidos por región ── */}
+      <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle className="text-white">Pedidos por región</CardTitle>
+          <CardTitle>Pedidos por región</CardTitle>
           {vizRegion && (
-            <Button size="sm" variant="ghost" className="text-gray-400" onClick={() => setVizRegion(null)}>
+            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setVizRegion(null)}>
               Quitar selección
             </Button>
           )}
         </CardHeader>
         <CardContent className="space-y-6">
           {regionBars.length === 0 ? (
-            <p className="text-gray-500 text-sm">Sin datos para el periodo del gráfico y producto seleccionado.</p>
+            <p className="text-sm text-muted-foreground">Sin datos para el periodo del gráfico y producto seleccionado.</p>
           ) : (
             <div className="h-[280px]">
               <ResponsiveContainer width="100%" height="100%">
@@ -798,89 +634,79 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                   margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
                   onClick={(s) => {
                     const p = s?.activePayload?.[0]?.payload as { region?: string } | undefined;
-                    if (p?.region) setVizRegion((prev) => (prev === p.region ? null : p.region));
+                    const r = p?.region;
+                    if (r) setVizRegion((prev) => (prev === r ? null : r));
                   }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis dataKey="region" tick={{ fill: "#9ca3af", fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={72} />
-                  <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip
-                    cursor={{ fill: "rgba(55,65,81,0.35)" }}
-                    contentStyle={{ backgroundColor: "#1f2937", border: "1px solid #4b5563" }}
-                    labelStyle={{ color: "#e5e7eb" }}
-                  />
-                  <Bar dataKey="count" name="Pedidos" radius={[4, 4, 0, 0]}>
-                    {regionBars.map((entry) => (
-                      <Cell
-                        key={entry.region}
-                        fill={vizRegion === entry.region ? "#34d399" : "#6b7280"}
-                        className="cursor-pointer"
-                      />
-                    ))}
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.4} />
+                  <XAxis dataKey="region" tick={{ fill: chartTheme.tick, fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={72} />
+                  <YAxis tick={{ fill: chartTheme.tick, fontSize: 11 }} allowDecimals={false} />
+                  <Tooltip cursor={{ fill: "hsl(var(--accent)/0.3)" }} {...chartTheme.tooltip} />
+                  <Bar dataKey="count" name="Pedidos" radius={[6, 6, 0, 0]}>
+                    {regionBars.map((entry) => {
+                      const fill = regionChartColor(entry.region);
+                      const selected = vizRegion === entry.region;
+                      const dimmed = vizRegion != null && !selected;
+                      return (
+                        <Cell
+                          key={entry.region}
+                          fill={fill}
+                          fillOpacity={dimmed ? 0.38 : 1}
+                          stroke={selected ? "hsl(var(--foreground))" : "transparent"}
+                          strokeWidth={selected ? 2 : 0}
+                          className="cursor-pointer transition-[opacity] duration-200"
+                        />
+                      );
+                    })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
-          <p className="text-xs text-gray-500">
-            Clic en una barra para ver KPIs de esa región (mismo periodo del gráfico de tendencia y filtro de producto).
-            Meta se reparte proporcionalmente al volumen de pedidos.
+          <p className="text-xs text-muted-foreground">
+            Clic en una barra para ver KPIs de esa región. El gasto en anuncios se reparte proporcionalmente al volumen de pedidos.
           </p>
 
           {vizRegion && regionVizMetrics && (
-            <div className="space-y-3 border-t border-gray-700 pt-4">
-              <h4 className="text-white font-semibold text-sm flex items-center gap-2">
-                <MapPin className="w-4 h-4" /> {vizRegion}
+            <div className="space-y-3 border-t border-border pt-4">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span
+                  className="flex size-6 items-center justify-center rounded-md ring-1 ring-white/10"
+                  style={{ backgroundColor: `${regionChartColor(vizRegion)}33` }}
+                  aria-hidden
+                >
+                  <MapPin className="size-3.5" style={{ color: regionChartColor(vizRegion) }} />
+                </span>
+                {vizRegion}
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 <MetricCard title="Pedidos" value={String(regionVizMetrics.totalPedidos)} icon={Package} loading={loading} />
-                <MetricCard
-                  title="Total vendido"
-                  value={formatMoney(regionVizMetrics.totalVendido)}
-                  icon={DollarSign}
-                  loading={loading}
-                />
-                <MetricCard
-                  title="Ganancia real"
-                  value={formatMoney(regionVizMetrics.gananciaReal)}
-                  icon={TrendingUp}
-                  color="success"
-                  loading={loading}
-                />
-                <MetricCard
-                  title="Ganancia est."
-                  value={formatMoney(regionVizMetrics.gananciaEstimada)}
-                  icon={TrendingUp}
-                  color="warning"
-                  loading={loading}
-                />
+                <MetricCard title="Total vendido" value={formatMoney(regionVizMetrics.totalVendido)} icon={DollarSign} loading={loading} />
+                <MetricCard title="Ganancia real" value={formatMoney(regionVizMetrics.gananciaReal)} icon={TrendingUp} color="success" loading={loading} />
+                <MetricCard title="Ganancia est." value={formatMoney(regionVizMetrics.gananciaEstimada)} icon={TrendingUp} color="warning" loading={loading} />
                 <MetricCard title="ROAS real" value={formatRoas(regionVizMetrics.roasReal)} icon={BarChart3} loading={loading} />
-                <MetricCard
-                  title="CPA"
-                  value={regionVizMetrics.cpa != null ? formatMoney(regionVizMetrics.cpa) : "—"}
-                  icon={Target}
-                  loading={loading}
-                />
+                <MetricCard title="CPA" value={regionVizMetrics.cpa != null ? formatMoney(regionVizMetrics.cpa) : "—"} icon={Target} loading={loading} />
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Card className="bg-gray-900/50 border-gray-700">
+      {/* ── Logística ── */}
+      <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle className="text-white flex items-center gap-2">
-            <Truck className="w-5 h-5" /> Logística (transportadora)
+          <CardTitle className="flex items-center gap-2">
+            <Truck className="size-4" strokeWidth={2} /> Logística (transportadora)
           </CardTitle>
           {carrier !== "all" && (
-            <Button size="sm" variant="ghost" className="text-gray-400" onClick={() => setCarrier("all")}>
+            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setCarrier("all")}>
               Quitar filtro
             </Button>
           )}
         </CardHeader>
         <CardContent>
           {carrierBreakdown.length === 0 ? (
-            <p className="text-gray-500 text-sm">Sin pedidos en este rango / filtros.</p>
+            <p className="text-sm text-muted-foreground">Sin pedidos en este rango / filtros.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {carrierBreakdown.map((row) => {
@@ -892,53 +718,43 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                     key={row.carrier}
                     type="button"
                     onClick={() => setCarrier(isActive ? "all" : row.carrier)}
-                    className={`text-left rounded-xl border p-4 transition-colors ${
+                    className={`text-left rounded-xl border p-4 transition-all duration-base ease-standard ${
                       isActive
-                        ? "border-emerald-500/60 bg-emerald-500/10"
-                        : "border-gray-700 bg-gray-800/40 hover:bg-gray-800/70"
+                        ? "border-primary/30 bg-primary/[0.04] shadow-glow"
+                        : "border-border/60 bg-card hover:border-border hover:shadow-elev-1"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2 text-white font-semibold">
-                        <Truck className="w-4 h-4 text-emerald-400" />
+                      <div className="flex items-center gap-2 text-foreground font-semibold text-sm">
+                        <Truck className={`size-4 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
                         {row.carrier}
                       </div>
-                      <Badge variant="secondary" className="bg-gray-700 text-gray-200">
-                        {row.metrics.totalPedidos} pedidos
-                      </Badge>
+                      <Badge variant="soft">{row.metrics.totalPedidos} pedidos</Badge>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs text-gray-300">
+                    <div className="grid grid-cols-3 gap-2 text-xs">
                       <div>
-                        <div className="text-gray-500">Entregados</div>
-                        <div className="text-emerald-400 font-semibold">
-                          {row.metrics.counts.entregados} ({pctRow(row.metrics.counts.entregados)})
-                        </div>
+                        <div className="text-muted-foreground mb-0.5">Entregados</div>
+                        <div className="text-success font-semibold tabular-nums">{row.metrics.counts.entregados} ({pctRow(row.metrics.counts.entregados)})</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">En tránsito</div>
-                        <div className="text-blue-300 font-semibold">
-                          {row.metrics.counts.confirmados} ({pctRow(row.metrics.counts.confirmados)})
-                        </div>
+                        <div className="text-muted-foreground mb-0.5">En tránsito</div>
+                        <div className="text-info font-semibold tabular-nums">{row.metrics.counts.confirmados} ({pctRow(row.metrics.counts.confirmados)})</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Devolución</div>
-                        <div className="text-orange-300 font-semibold">
-                          {row.metrics.counts.enDevolucion} ({pctRow(row.metrics.counts.enDevolucion)})
-                        </div>
+                        <div className="text-muted-foreground mb-0.5">Devolución</div>
+                        <div className="text-warning font-semibold tabular-nums">{row.metrics.counts.enDevolucion} ({pctRow(row.metrics.counts.enDevolucion)})</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Cancelados</div>
-                        <div className="text-red-300 font-semibold">
-                          {row.metrics.counts.cancelados} ({pctRow(row.metrics.counts.cancelados)})
-                        </div>
+                        <div className="text-muted-foreground mb-0.5">Cancelados</div>
+                        <div className="text-destructive font-semibold tabular-nums">{row.metrics.counts.cancelados} ({pctRow(row.metrics.counts.cancelados)})</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">Ganancia real</div>
-                        <div className="text-white font-semibold">{formatMoney(row.metrics.gananciaReal)}</div>
+                        <div className="text-muted-foreground mb-0.5">Ganancia real</div>
+                        <div className="text-foreground font-semibold tabular-nums">{formatMoney(row.metrics.gananciaReal)}</div>
                       </div>
                       <div>
-                        <div className="text-gray-500">ROAS real</div>
-                        <div className="text-white font-semibold">{formatRoas(row.metrics.roasReal)}</div>
+                        <div className="text-muted-foreground mb-0.5">ROAS real</div>
+                        <div className="text-foreground font-semibold tabular-nums">{formatRoas(row.metrics.roasReal)}</div>
                       </div>
                     </div>
                   </button>
@@ -946,225 +762,211 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
               })}
             </div>
           )}
-          <p className="text-xs text-gray-500 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             Clic en una tarjeta para filtrar todo el panel por esa logística. Meta se reparte por volumen de pedidos.
           </p>
         </CardContent>
       </Card>
 
-      <Card className="bg-gray-900/50 border-gray-700">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle className="text-white flex items-center gap-2">
-            <MapPin className="w-5 h-5" /> Resumen automático por región
-          </CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowRegionGrid((v) => !v)}
-          >
-            {showRegionGrid ? "Ocultar" : "Mostrar"}
-          </Button>
-        </CardHeader>
-        {showRegionGrid && (
-          <CardContent>
-            {regionBreakdown.length === 0 ? (
-              <p className="text-gray-500 text-sm">Sin pedidos en este rango / filtros.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {regionBreakdown.map((row) => {
-                  const totalRow = row.metrics.totalPedidos;
-                  const pctRow = (n: number) => (totalRow > 0 ? `${Math.round((n / totalRow) * 100)}%` : "0%");
-                  const isActive = region === row.region;
-                  return (
-                    <div
-                      key={row.region}
-                      className={`rounded-xl border p-4 transition-colors ${
-                        isActive ? "border-emerald-500/60 bg-emerald-500/10" : "border-gray-700 bg-gray-800/40"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2 text-white font-semibold">
-                          <MapPin className="w-4 h-4 text-emerald-400" />
-                          {row.region}
-                        </div>
-                        <Badge variant="secondary" className="bg-gray-700 text-gray-200">
-                          {row.metrics.totalPedidos} pedidos
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-300 mb-3">
-                        <div>
-                          <div className="text-gray-500">Entregados</div>
-                          <div className="text-emerald-400 font-semibold">
-                            {row.metrics.counts.entregados} ({pctRow(row.metrics.counts.entregados)})
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">En tránsito</div>
-                          <div className="text-blue-300 font-semibold">
-                            {row.metrics.counts.confirmados} ({pctRow(row.metrics.counts.confirmados)})
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">Pendientes</div>
-                          <div className="text-yellow-300 font-semibold">
-                            {row.metrics.counts.pendientes} ({pctRow(row.metrics.counts.pendientes)})
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">Novedades</div>
-                          <div className="text-amber-300 font-semibold">
-                            {row.metrics.counts.novedades} ({pctRow(row.metrics.counts.novedades)})
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">Devolución</div>
-                          <div className="text-orange-300 font-semibold">
-                            {row.metrics.counts.enDevolucion} ({pctRow(row.metrics.counts.enDevolucion)})
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">Cancelados</div>
-                          <div className="text-red-300 font-semibold">
-                            {row.metrics.counts.cancelados} ({pctRow(row.metrics.counts.cancelados)})
-                          </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 border-t border-gray-700 pt-3">
-                        <div>
-                          <div className="text-gray-500">Total vendido</div>
-                          <div className="text-white font-semibold">{formatMoney(row.metrics.totalVendido)}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">Ganancia real</div>
-                          <div className="text-emerald-300 font-semibold">{formatMoney(row.metrics.gananciaReal)}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">ROAS real</div>
-                          <div className="text-white font-semibold">{formatRoas(row.metrics.roasReal)}</div>
-                        </div>
-                        <div>
-                          <div className="text-gray-500">CPA</div>
-                          <div className="text-white font-semibold">
-                            {row.metrics.cpa != null ? formatMoney(row.metrics.cpa) : "—"}
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 w-full"
-                        onClick={() => setRegion(isActive ? "all" : row.region)}
-                      >
-                        {isActive ? "Quitar filtro" : "Ver solo esta región"}
-                      </Button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <p className="text-xs text-gray-500 mt-3">
-              Cada tarjeta usa el rango principal y los filtros activos de producto y logística. Meta se reparte
-              proporcionalmente al volumen de cada región.
-            </p>
-          </CardContent>
-        )}
-      </Card>
-
+      {/* ── Producto #1 ── */}
       {topProductInsight && (
-        <Card className="bg-gray-900/50 border-gray-700">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white">Producto #1 — {topProductInsight.label}</CardTitle>
+            <CardTitle>Producto #1 — {topProductInsight.label}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-gray-300 text-sm">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div>
-                <span className="text-gray-500 block text-xs">Pedidos</span>
-                <span className="text-white font-medium">{topProductInsight.pedidos}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-xs">Precio promedio</span>
-                <span className="text-white font-medium">{formatMoney(topProductInsight.precioPromedio)}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-xs">Entrega</span>
-                <span className="text-white font-medium">{topProductInsight.pctEntregados}%</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-xs">Confirmación *</span>
-                <span className="text-white font-medium">{topProductInsight.pctConfirmados}%</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-xs">Devolución</span>
-                <span className="text-white font-medium">{topProductInsight.pctDevolucion}%</span>
-              </div>
-              <div>
-                <span className="text-gray-500 block text-xs">Cancelados</span>
-                <span className="text-white font-medium">{topProductInsight.pctCancelados}%</span>
-              </div>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-lg border border-border/40 bg-muted/20 p-4 text-sm">
+              {[
+                { label: "Pedidos", value: topProductInsight.pedidos },
+                { label: "Precio promedio", value: formatMoney(topProductInsight.precioPromedio) },
+                { label: "Entrega", value: `${topProductInsight.pctEntregados}%` },
+                { label: "Confirmación *", value: `${topProductInsight.pctConfirmados}%` },
+                { label: "Devolución", value: `${topProductInsight.pctDevolucion}%` },
+                { label: "Cancelados", value: `${topProductInsight.pctCancelados}%` },
+              ].map((item) => (
+                <div key={item.label}>
+                  <div className="text-xs text-muted-foreground mb-0.5">{item.label}</div>
+                  <div className="font-semibold text-foreground tabular-nums">{item.value}</div>
+                </div>
+              ))}
             </div>
-            <p className="text-xs text-gray-500">
-              * Confirmación = pedidos en tránsito / reparto (proxy operativo Dropi). Categorías según columna CATEGORÍAS
-              del Excel.
+            <p className="text-xs text-muted-foreground">
+              * Confirmación = pedidos en tránsito o en reparto (proxy operativo). Las categorías provienen del campo de categorías de cada pedido importado.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <MetricCard
-                title="Breakeven / pedido"
-                value={
-                  topProductInsight.breakevenPorPedido != null
-                    ? formatMoney(topProductInsight.breakevenPorPedido)
-                    : "—"
-                }
-                icon={Scale}
-                description="Coste variable medio entregado + Meta prorrateada / entregado"
-                loading={loading}
-              />
-              <MetricCard
-                title="Profit neto / pedido"
-                value={
-                  topProductInsight.profitNetoPorPedido != null
-                    ? formatMoney(topProductInsight.profitNetoPorPedido)
-                    : "—"
-                }
-                icon={DollarSign}
-                color="success"
-                description="Ganancia media entregado − Meta prorrateada por entregado"
-                loading={loading}
-              />
-              <MetricCard
-                title="Precio sugerido"
-                value={
-                  topProductInsight.precioSugerido != null
-                    ? formatMoney(topProductInsight.precioSugerido)
-                    : "—"
-                }
-                icon={Target}
-                description="Breakeven × 1,30 (margen orientativo)"
-                loading={loading}
-              />
+              <MetricCard title="Breakeven / pedido" value={topProductInsight.breakevenPorPedido != null ? formatMoney(topProductInsight.breakevenPorPedido) : "—"} icon={Scale} description="Coste variable medio entregado + Meta prorrateada / entregado" loading={loading} />
+              <MetricCard title="Profit neto / pedido" value={topProductInsight.profitNetoPorPedido != null ? formatMoney(topProductInsight.profitNetoPorPedido) : "—"} icon={DollarSign} color="success" description="Ganancia media entregado − Meta prorrateada por entregado" loading={loading} />
+              <MetricCard title="Precio sugerido" value={topProductInsight.precioSugerido != null ? formatMoney(topProductInsight.precioSugerido) : "—"} icon={Target} description="Breakeven × 1,30 (margen orientativo)" loading={loading} />
             </div>
           </CardContent>
         </Card>
       )}
 
-      <Card className="bg-gray-900/50 border-gray-700">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle className="text-white">Pedidos ({filteredForMetrics.length} con filtros)</CardTitle>
-          <div className="text-xs text-gray-400">
-            CPA general: <span className="text-white font-semibold">{metrics.cpa != null ? formatMoney(metrics.cpa) : "—"}</span>
-            {metrics.cpa == null && <span className="ml-1 text-gray-500">(añade gasto Meta + entregados)</span>}
+      {/* ── Lista de pedidos ── */}
+      <Card>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 space-y-1.5">
+              <CardTitle className="text-lg leading-tight sm:text-xl">
+                Pedidos
+                <span className="ml-2 text-base font-normal text-muted-foreground tabular-nums">
+                  ({ordersListFiltered.length}
+                  {clientQuery.trim() && filteredForMetrics.length !== ordersListFiltered.length
+                    ? ` de ${filteredForMetrics.length}`
+                    : ""}
+                  )
+                </span>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                CPA general:{" "}
+                <span className="font-semibold text-foreground tabular-nums">
+                  {metrics.cpa != null ? formatMoney(metrics.cpa) : "—"}
+                </span>
+                {metrics.cpa == null && (
+                  <span className="ml-1">(añade gasto en anuncios y pedidos entregados)</span>
+                )}
+              </p>
+            </div>
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center lg:max-w-xl">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  placeholder="Buscar cliente, teléfono, email, guía…"
+                  value={clientQuery}
+                  onChange={(e) => setClientQuery(e.target.value)}
+                  className="h-9 pl-9"
+                  aria-label="Buscar en la lista de pedidos"
+                />
+              </div>
+              <Popover open={filtersOpen} onOpenChange={setFiltersOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 w-full shrink-0 justify-center gap-2 border-border/80 bg-input/40 sm:w-auto"
+                  >
+                    <Filter className="size-4" />
+                    Filtros
+                    {dimensionFilterActive > 0 ? (
+                      <Badge variant="secondary" className="h-5 min-w-5 rounded-full px-1.5 tabular-nums">
+                        {dimensionFilterActive}
+                      </Badge>
+                    ) : null}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[min(100vw-1.5rem,400px)] p-0" align="end">
+                  <div className="border-b border-border/60 px-3 py-2.5">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Filtra por región, categoría de producto y transportadora. Los números son pedidos en el rango de fechas
+                      superior, según lo que ya tengas seleccionado en cada grupo.
+                    </p>
+                  </div>
+                  <Command shouldFilter>
+                    <CommandInput placeholder="Buscar región, producto o logística…" className="h-10" />
+                    <CommandList className="max-h-[min(55vh,340px)]">
+                      <CommandEmpty>Nada coincide con la búsqueda.</CommandEmpty>
+                      <CommandGroup heading="Región">
+                        {regionFilterOptions.map((opt) => (
+                          <CommandItem
+                            key={`r-${opt.value}`}
+                            value={`región ${opt.label} ${opt.count}`}
+                            onSelect={() => setRegion(opt.value)}
+                            className="cursor-pointer"
+                          >
+                            <span
+                              className="mr-2 size-2 shrink-0 rounded-full ring-1 ring-white/10"
+                              style={{
+                                backgroundColor: opt.value === "all" ? "hsl(var(--muted))" : regionChartColor(opt.label),
+                              }}
+                              aria-hidden
+                            />
+                            <span className="flex-1 truncate">{opt.label}</span>
+                            <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
+                            {region === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <CommandGroup heading="Producto / categoría">
+                        {productFilterOptions.map((opt) => (
+                          <CommandItem
+                            key={`p-${opt.value}`}
+                            value={`producto categoría ${opt.label} ${opt.count}`}
+                            onSelect={() => setProduct(opt.value)}
+                            className="cursor-pointer"
+                          >
+                            <Package className="mr-2 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                            <span className="flex-1 truncate">{opt.label}</span>
+                            <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
+                            {product === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <CommandGroup heading="Logística">
+                        {carrierFilterOptions.map((opt) => (
+                          <CommandItem
+                            key={`c-${opt.value}`}
+                            value={`logística transporte ${opt.label} ${opt.count}`}
+                            onSelect={() => setCarrier(opt.value)}
+                            className="cursor-pointer"
+                          >
+                            <Truck className="mr-2 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                            <span className="flex-1 truncate">{opt.label}</span>
+                            <span className="tabular-nums text-xs text-muted-foreground">{opt.count}</span>
+                            {carrier === opt.value ? <Check className="ml-2 size-4 shrink-0 text-primary" /> : null}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 p-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground"
+                      onClick={() => {
+                        setRegion("all");
+                        setProduct("all");
+                        setCarrier("all");
+                      }}
+                    >
+                      Limpiar filtros
+                    </Button>
+                    <Button type="button" size="sm" onClick={() => setFiltersOpen(false)}>
+                      Listo
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center gap-2 text-gray-400 py-8">
-              <RefreshCw className="w-6 h-6 animate-spin" /> Cargando…
+            <div className="flex items-center gap-2 text-muted-foreground py-8">
+              <RefreshCw className="size-5 animate-spin" /> Cargando…
             </div>
           ) : filteredForMetrics.length === 0 ? (
-            <p className="text-gray-400 py-8 text-center">No hay pedidos en este rango. Importa un .xlsx de Dropi.</p>
+            <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+              <Package className="size-10 opacity-30" />
+              <p className="text-sm">No hay pedidos en este rango. Importa un archivo de guías compatible.</p>
+            </div>
+          ) : ordersListFiltered.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+              <Search className="size-10 opacity-30" />
+              <p className="text-sm font-medium text-foreground">Ningún pedido coincide</p>
+              <p className="text-xs text-center max-w-sm">
+                Prueba otras palabras en la búsqueda o abre <span className="font-medium text-foreground">Filtros</span>{" "}
+                para ajustar región, producto o logística.
+              </p>
+            </div>
           ) : (
             <ScrollArea className="h-[560px]">
               <div className="space-y-3 pr-3">
-                {filteredForMetrics.map((o) => {
+                {ordersListFiltered.map((o) => {
                   const sale = o.product_sale_amount ?? 0;
                   const profit = o.profit ?? 0;
                   const ship = o.shipping_price ?? 0;
@@ -1172,111 +974,69 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                   const gananciaAprox = profit - cpaGeneral;
                   const margenPct = sale > 0 ? Math.round((gananciaAprox / sale) * 1000) / 10 : 0;
                   return (
-                    <Card key={o.id} className="bg-gray-800/50 border-gray-700">
+                    <Card key={o.id}>
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-2">
-                            <Badge className={`border ${bucketBadgeClass(o.status_bucket)} flex-shrink-0`}>
+                            <Badge variant={bucketVariant(o.status_bucket)}>
                               {BUCKET_LABEL[o.status_bucket] ?? o.status_bucket}
                             </Badge>
                             <div>
-                              <div className="text-white font-semibold">
+                              <div className="text-sm font-semibold text-foreground">
                                 #{o.dropi_numeric_id}
                                 {o.shop_order_number ? ` · Tienda ${o.shop_order_number}` : ""}
                               </div>
-                              <div className="text-xs text-gray-400">
-                                {o.order_date}
-                                {o.order_time ? ` · ${o.order_time}` : ""}
+                              <div className="text-xs text-muted-foreground">
+                                {o.order_date}{o.order_time ? ` · ${o.order_time}` : ""}
                               </div>
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-emerald-400 font-bold text-lg">{formatMoney(sale)}</div>
-                            <div className="text-[10px] uppercase tracking-wide text-gray-500">Total venta</div>
+                            <div className="text-success font-bold text-lg tabular-nums">{formatMoney(sale)}</div>
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total venta</div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm bg-gray-800/40 border border-gray-700 rounded-lg p-3">
-                          <div className="text-gray-300">
-                            <span className="text-gray-500">Cliente:</span>{" "}
-                            <span className="text-white font-medium">{o.customer_name ?? "—"}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            <span className="text-gray-500">Tel:</span>{" "}
-                            <span className="text-white font-medium">{o.customer_phone ?? "—"}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            <span className="text-gray-500">Transp.:</span>{" "}
-                            <span className="text-white font-medium">{carrierKey(o)}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            <span className="text-gray-500">Región:</span>{" "}
-                            <span className="text-white font-medium">{regionKey(o)}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            <span className="text-gray-500">Producto:</span>{" "}
-                            <span className="text-white font-medium">{(o.categories ?? "").trim() || "Sin categoría"}</span>
-                          </div>
-                          <div className="text-gray-300">
-                            <span className="text-gray-500">Guía:</span>{" "}
-                            <span className="text-white font-medium">{o.guide_number ?? "—"}</span>
-                          </div>
-                          <div className="text-gray-300 md:col-span-2">
-                            <span className="text-gray-500">Dirección:</span>{" "}
-                            <span className="text-white font-medium">{o.address ?? "—"}</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 text-sm rounded-lg border border-border/40 bg-muted/20 p-3">
+                          {[
+                            { label: "Cliente", value: o.customer_name ?? "—" },
+                            { label: "Tel", value: o.customer_phone ?? "—" },
+                            { label: "Transp.", value: carrierKey(o) },
+                            { label: "Región", value: regionKey(o) },
+                            { label: "Producto", value: (o.categories ?? "").trim() || "Sin categoría" },
+                            { label: "Guía", value: o.guide_number ?? "—" },
+                          ].map((item) => (
+                            <div key={item.label} className="text-muted-foreground">
+                              <span className="text-xs">{item.label}:</span>{" "}
+                              <span className="text-foreground font-medium">{item.value}</span>
+                            </div>
+                          ))}
+                          <div className="text-muted-foreground md:col-span-2">
+                            <span className="text-xs">Dirección:</span>{" "}
+                            <span className="text-foreground font-medium">{o.address ?? "—"}</span>
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2">
-                            <div className="text-[10px] uppercase tracking-wide text-emerald-300/80">Venta</div>
-                            <div className="text-emerald-300 font-bold">{formatMoney(sale)}</div>
+                          <div className="rounded-lg border border-success/25 bg-success/8 p-2">
+                            <div className="text-[10px] uppercase tracking-wide text-success/70 mb-0.5">Venta</div>
+                            <div className="text-success font-bold tabular-nums">{formatMoney(sale)}</div>
                           </div>
-                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2">
-                            <div className="text-[10px] uppercase tracking-wide text-amber-300/80">CPA general</div>
-                            <div className="text-amber-300 font-bold">
-                              {metrics.cpa != null ? formatMoney(cpaGeneral) : "—"}
-                            </div>
+                          <div className="rounded-lg border border-warning/25 bg-warning/8 p-2">
+                            <div className="text-[10px] uppercase tracking-wide text-warning/70 mb-0.5">CPA general</div>
+                            <div className="text-warning font-bold tabular-nums">{metrics.cpa != null ? formatMoney(cpaGeneral) : "—"}</div>
                           </div>
-                          <div
-                            className={`rounded-lg border p-2 ${
-                              gananciaAprox >= 0
-                                ? "border-blue-500/30 bg-blue-500/10"
-                                : "border-red-500/30 bg-red-500/10"
-                            }`}
-                          >
-                            <div
-                              className={`text-[10px] uppercase tracking-wide ${
-                                gananciaAprox >= 0 ? "text-blue-300/80" : "text-red-300/80"
-                              }`}
-                            >
-                              Ganancia aprox.
-                            </div>
-                            <div className={`font-bold ${gananciaAprox >= 0 ? "text-blue-300" : "text-red-300"}`}>
-                              {formatMoney(gananciaAprox)}
-                            </div>
+                          <div className={`rounded-lg border p-2 ${gananciaAprox >= 0 ? "border-primary/25 bg-primary/8" : "border-destructive/25 bg-destructive/8"}`}>
+                            <div className={`text-[10px] uppercase tracking-wide mb-0.5 ${gananciaAprox >= 0 ? "text-primary/70" : "text-destructive/70"}`}>Ganancia aprox.</div>
+                            <div className={`font-bold tabular-nums ${gananciaAprox >= 0 ? "text-primary" : "text-destructive"}`}>{formatMoney(gananciaAprox)}</div>
                           </div>
-                          <div className="rounded-lg border border-gray-700 bg-gray-900/40 p-2">
-                            <div className="text-[10px] uppercase tracking-wide text-gray-400">Envío</div>
-                            <div className="text-white font-bold">{formatMoney(ship)}</div>
+                          <div className="rounded-lg border border-border/40 bg-muted/30 p-2">
+                            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Envío</div>
+                            <div className="text-foreground font-bold tabular-nums">{formatMoney(ship)}</div>
                           </div>
-                          <div
-                            className={`rounded-lg border p-2 ${
-                              margenPct >= 0
-                                ? "border-orange-500/30 bg-orange-500/10"
-                                : "border-red-500/30 bg-red-500/10"
-                            }`}
-                          >
-                            <div
-                              className={`text-[10px] uppercase tracking-wide ${
-                                margenPct >= 0 ? "text-orange-300/80" : "text-red-300/80"
-                              }`}
-                            >
-                              Margen
-                            </div>
-                            <div className={`font-bold ${margenPct >= 0 ? "text-orange-300" : "text-red-300"}`}>
-                              {sale > 0 ? `${margenPct}%` : "—"}
-                            </div>
+                          <div className={`rounded-lg border p-2 ${margenPct >= 0 ? "border-info/25 bg-info/8" : "border-destructive/25 bg-destructive/8"}`}>
+                            <div className={`text-[10px] uppercase tracking-wide mb-0.5 ${margenPct >= 0 ? "text-info/70" : "text-destructive/70"}`}>Margen</div>
+                            <div className={`font-bold tabular-nums ${margenPct >= 0 ? "text-info" : "text-destructive"}`}>{sale > 0 ? `${margenPct}%` : "—"}</div>
                           </div>
                         </div>
                       </CardContent>
@@ -1286,88 +1046,64 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
               </div>
             </ScrollArea>
           )}
-          <p className="text-[11px] text-gray-500 mt-3">
-            <span className="text-gray-300 font-semibold">CPA general</span> = inversión Meta del rango / pedidos
-            entregados. Es el coste publicitario que carga cada entrega.{" "}
-            <span className="text-gray-300 font-semibold">Ganancia aprox.</span> = ganancia del pedido − CPA general.
-            <span className="text-gray-300 font-semibold"> Margen</span> = ganancia aprox. / venta.
+          <p className="text-[11px] text-muted-foreground mt-3">
+            <span className="font-semibold text-foreground/80">CPA general</span> = inversión Meta del rango / pedidos entregados.{" "}
+            <span className="font-semibold text-foreground/80">Ganancia aprox.</span> = ganancia del pedido − CPA general.{" "}
+            <span className="font-semibold text-foreground/80">Margen</span> = ganancia aprox. / venta.
           </p>
         </CardContent>
       </Card>
 
-      <Dialog
-        open={!!postImport?.open}
-        onOpenChange={(o) => {
-          if (!o) setPostImport(null);
-        }}
-      >
-        <DialogContent className="bg-gray-900 border-gray-700 text-white">
+      {/* ── Dialog post-import ── */}
+      <Dialog open={!!postImport?.open} onOpenChange={(o) => { if (!o) setPostImport(null); }}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Megaphone className="w-5 h-5 text-emerald-400" />
+              <Megaphone className="size-4 text-primary" />
               Confirma rango y gasto en Meta
             </DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription>
               Detectamos las fechas del archivo. Ajusta si quieres y registra el gasto en Meta de ese mismo periodo:
               ROAS, CPA y precio sugerido se calculan con esos datos.
             </DialogDescription>
           </DialogHeader>
           {postImport && (
             <div className="space-y-4 mt-2">
-              <div className="text-xs text-gray-400">
-                Detectado en el Excel: <span className="text-gray-200">{postImport.detectedFrom}</span> →{" "}
-                <span className="text-gray-200">{postImport.detectedTo}</span> · {postImport.rowsImported} filas
-                importadas.
+              <div className="text-xs text-muted-foreground rounded-lg border border-border/40 bg-muted/20 p-3">
+                Fechas detectadas en el archivo:{" "}
+                <span className="font-medium text-foreground">{postImport.detectedFrom}</span> →{" "}
+                <span className="font-medium text-foreground">{postImport.detectedTo}</span>{" "}
+                · <span className="font-medium text-foreground">{postImport.rowsImported} filas</span> importadas.
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Fecha de inicio</label>
-                  <Input
-                    type="date"
-                    value={postImport.rangeFrom}
-                    onChange={(e) =>
-                      setPostImport((p) => (p ? { ...p, rangeFrom: e.target.value } : p))
-                    }
-                    className="bg-gray-800 border-gray-600 text-white"
-                  />
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Fecha de inicio</label>
+                  <Input type="date" value={postImport.rangeFrom} onChange={(e) => setPostImport((p) => (p ? { ...p, rangeFrom: e.target.value } : p))} />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Fecha de término</label>
-                  <Input
-                    type="date"
-                    value={postImport.rangeTo}
-                    onChange={(e) =>
-                      setPostImport((p) => (p ? { ...p, rangeTo: e.target.value } : p))
-                    }
-                    className="bg-gray-800 border-gray-600 text-white"
-                  />
+                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Fecha de término</label>
+                  <Input type="date" value={postImport.rangeTo} onChange={(e) => setPostImport((p) => (p ? { ...p, rangeTo: e.target.value } : p))} />
                 </div>
               </div>
               <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Gasto en Meta para este rango (CLP) <span className="text-red-400">*</span>
+                <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+                  Gasto en Meta para este rango (CLP) <span className="text-destructive">*</span>
                 </label>
                 <Input
                   type="text"
                   inputMode="decimal"
                   placeholder="Ej: 270000"
                   value={postImport.metaInput}
-                  onChange={(e) =>
-                    setPostImport((p) => (p ? { ...p, metaInput: e.target.value } : p))
-                  }
-                  className="bg-gray-800 border-gray-600 text-white"
+                  onChange={(e) => setPostImport((p) => (p ? { ...p, metaInput: e.target.value } : p))}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Si no invertiste en Meta este periodo escribe 0. Es obligatorio para que el panel calcule ROAS, CPA y
-                  precio sugerido.
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Si no invertiste en Meta este periodo escribe 0. Es obligatorio para ROAS, CPA y precio sugerido.
                 </p>
               </div>
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="ghost" onClick={() => setPostImport(null)}>
-              Recordar después
-            </Button>
+            <Button variant="ghost" onClick={() => setPostImport(null)}>Recordar después</Button>
             <Button onClick={() => void confirmPostImport()}>Guardar gasto Meta</Button>
           </DialogFooter>
         </DialogContent>

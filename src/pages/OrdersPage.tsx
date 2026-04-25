@@ -252,12 +252,12 @@ export default function OrdersPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white">Gestión de Pedidos</h1>
-            <p className="text-gray-400 mt-1">Shopify en vivo o importación Dropi desde Excel</p>
+            <p className="text-gray-400 mt-1">Importación masiva o pedidos en tiempo real desde tu tienda conectada</p>
           </div>
           <Tabs value={sourceTab} onValueChange={(v) => setSourceTab(v as 'shopify' | 'dropi')} className="w-full sm:w-auto">
             <TabsList className="bg-gray-800 border border-gray-700">
-              <TabsTrigger value="dropi" className="data-[state=active]:bg-gray-700">Dropi (Excel)</TabsTrigger>
-              <TabsTrigger value="shopify" className="data-[state=active]:bg-gray-700">Shopify</TabsTrigger>
+              <TabsTrigger value="dropi" className="data-[state=active]:bg-gray-700">Importación</TabsTrigger>
+              <TabsTrigger value="shopify" className="data-[state=active]:bg-gray-700">Tienda en vivo</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -291,13 +291,13 @@ export default function OrdersPage() {
               <div className="flex items-center gap-3">
                 <AlertTriangle className="w-6 h-6 text-yellow-400 flex-shrink-0" />
                 <div>
-                  <h3 className="text-white font-semibold">Conecta tu tienda Shopify</h3>
-                  <p className="text-sm text-gray-300">Sin tienda conectada no podemos cargar tus pedidos reales.</p>
+                  <h3 className="text-white font-semibold">Conecta tu tienda</h3>
+                  <p className="text-sm text-gray-300">Sin tienda conectada no podemos cargar tus pedidos en vivo.</p>
                 </div>
               </div>
               <Button onClick={() => navigate('/shopify/connect')}>
                 <ShoppingBag className="w-4 h-4 mr-2" />
-                Conectar Shopify
+                Conectar tienda
               </Button>
             </CardContent>
           </Card>
@@ -415,13 +415,13 @@ export default function OrdersPage() {
                 <p className="text-gray-400 mb-4">
                   {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' 
                     ? 'No se encontraron pedidos con los filtros aplicados'
-                    : 'Conecta tu tienda Shopify para ver los pedidos aquí'
+                    : 'Conecta tu tienda para ver los pedidos en vivo aquí'
                   }
                 </p>
                 {!searchTerm && statusFilter === 'all' && priorityFilter === 'all' && !isConnected && (
                   <Button onClick={() => navigate('/shopify/connect')}>
                     <ShoppingBag className="w-4 h-4 mr-2" />
-                    Conectar Shopify
+                    Conectar tienda
                   </Button>
                 )}
               </div>

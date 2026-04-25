@@ -76,10 +76,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   useEffect(() => {
     async function checkShopifyConnection() {
       if (!user) return;
-      
+
       try {
         const { data, error } = await supabase
-          .from('shops')
+          .from('shopify_connections')
           .select('id')
           .eq('user_id', user.id)
           .eq('is_active', true)

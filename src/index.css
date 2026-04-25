@@ -1,401 +1,294 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Reset agresivo para eliminar cualquier espacio superior */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html {
-  margin: 0 !important;
-  padding: 0 !important;
-  background-color: #000000 !important;
-}
-
-html, body {
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow-x: hidden;
-  background-color: #000000 !important;
-}
-
-#root {
-  margin: 0 !important;
-  padding: 0 !important;
-  background-color: #000000 !important;
-}
-
-/* Asegurar que el header esté pegado al borde superior */
-header {
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  top: 0 !important;
-  position: sticky !important;
-  transform: translateY(0) !important;
-  z-index: 9999 !important;
-}
-
-/* Forzar que el header cubra completamente el área superior - solo en LandingPage */
-.landing-page header::before {
-  content: '';
-  position: absolute;
-  top: -20px;
-  left: 0;
-  right: 0;
-  height: 20px;
-  background-color: #000000;
-  z-index: -1;
-}
-
-/* Asegurar que el contenedor de LandingPage cubra el margen gris */
-.landing-page {
-  position: relative;
-  margin-top: -1px !important;
-  padding-top: 1px !important;
-}
-
-/* Solo aplicar reglas específicas a la LandingPage - no al dashboard */
-.landing-page header {
-  position: sticky !important;
-  top: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: translateY(0) !important;
-  z-index: 50 !important;
-}
-
-/* Eliminar cualquier espacio del viewport */
-html, body, #root, .min-h-screen {
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  outline: 0 !important;
-}
-
-/* Eliminar completamente cualquier espacio superior */
-html, body, #root, .min-h-screen, header, .container {
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  top: 0 !important;
-}
-
-/* Eliminar cualquier espacio del viewport completo */
-html {
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  outline: 0 !important;
-  background-color: #000000 !important;
-  overflow-x: hidden !important;
-}
-
-/* Forzar que el body esté en la posición 0,0 */
-body {
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  outline: 0 !important;
-  background-color: #000000 !important;
-  position: relative !important;
-  top: 0 !important;
-  left: 0 !important;
-}
-
-/* Forzar que el primer elemento esté en la posición 0,0 */
-body > *:first-child,
-#root > *:first-child {
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-}
-
-/* NO forzar posiciones en elementos del dashboard - dejar que funcionen naturalmente */
-
-/* Asegurar que el header del dashboard no interfiera con el contenido */
-header {
-  pointer-events: auto;
-}
-
-header * {
-  pointer-events: auto;
-}
-
-/* Evitar que el header se "coma" el contenido al hacer hover */
-header:hover {
-  z-index: 30 !important;
-}
-
-/* Eliminar cualquier espacio del contenedor principal */
-.min-h-screen {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Animaciones para el logo de carga */
-@keyframes shimmer {
-  0% { transform: translateX(-100%) skew(-3deg); }
-  100% { transform: translateX(100%) skew(-3deg); }
-}
-
-@keyframes progressBar {
-  0% { 
-    width: 0%;
-    background-position: 0% 50%;
-  }
-  50% { 
-    width: 70%;
-    background-position: 100% 50%;
-  }
-  100% { 
-    width: 100%;
-    background-position: 0% 50%;
-  }
-}
-
-.animate-shimmer {
-  animation: shimmer 2s infinite;
-}
-
-.animate-progress-bar {
-  animation: progressBar 2s ease-in-out infinite;
-}
-
-/* Animaciones para notificaciones */
-@keyframes slideInRight {
-  0% {
-    transform: translateX(100%) scale(0.95);
-    opacity: 0;
-  }
-  50% {
-    transform: translateX(-5%) scale(1.02);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes slideOutRight {
-  0% {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%) scale(0.95);
-    opacity: 0;
-  }
-}
-
-@keyframes fadeInUp {
-  0% {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInUp {
-  0% {
-    transform: translateY(100%) scale(0.95);
-    opacity: 0;
-  }
-  50% {
-    transform: translateY(-5%) scale(1.02);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-.animate-slide-in-right {
-  animation: slideInRight 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.animate-slide-out-right {
-  animation: slideOutRight 0.3s ease-in;
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.3s ease-out;
-}
-
-.animate-slide-in-up {
-  animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* Utility classes */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Professional Dropshipping Dashboard Design System */
+/* =========================================================================
+   NOMADEV — Design System 2026
+   Tokens HSL, fundamento sin !important, escala tipográfica modular,
+   sombras de elevación, motion tokens, scrollbar sobria.
+   ========================================================================= */
 
 @layer base {
-
+  :root,
   .dark {
-    /* Dark Professional Theme */
-    --background: 222 47% 3%;
-    --foreground: 210 40% 98%;
+    /* Surface scale — neutros más cálidos, mayor contraste por capa */
+    --background: 224 24% 4%;
+    --foreground: 210 20% 98%;
 
-    --card: 222 47% 4%;
-    --card-foreground: 210 40% 98%;
+    --card: 224 22% 6%;
+    --card-foreground: 210 20% 98%;
 
-    --popover: 222 47% 4%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 224 22% 7%;
+    --popover-foreground: 210 20% 98%;
 
-    /* Corporate Blue Primary */
+    /* Primary — azul corporativo Nomadev (sin tocar la marca) */
     --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 3%;
+    --primary-foreground: 224 24% 4%;
     --primary-hover: 217 91% 55%;
     --primary-glow: 217 91% 70%;
 
-    /* Professional Secondary */
-    --secondary: 215 25% 15%;
-    --secondary-foreground: 210 40% 98%;
-    --secondary-hover: 215 25% 18%;
+    /* Secondary — neutro elevado */
+    --secondary: 224 18% 12%;
+    --secondary-foreground: 210 20% 98%;
+    --secondary-hover: 224 18% 15%;
 
-    /* Muted Professional */
-    --muted: 215 25% 12%;
-    --muted-foreground: 217 10% 65%;
+    /* Muted — texto secundario y backgrounds sutiles */
+    --muted: 224 18% 10%;
+    --muted-foreground: 217 12% 65%;
 
-    /* Blue Accent */
-    --accent: 217 91% 60%;
-    --accent-foreground: 222 47% 3%;
+    /* Accent — para hovers e interacciones */
+    --accent: 224 18% 13%;
+    --accent-foreground: 210 20% 98%;
 
-    /* Status Colors */
-    --success: 142 76% 36%;
-    --success-foreground: 210 40% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 3%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    /* Status colors — pensados para dark mode con buen contraste */
+    --success: 142 71% 45%;
+    --success-foreground: 224 24% 4%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 224 24% 4%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 20% 98%;
+    --info: 199 89% 60%;
+    --info-foreground: 224 24% 4%;
 
-    /* UI Elements */
-    --border: 215 25% 15%;
-    --input: 215 25% 12%;
+    /* Borders & rings */
+    --border: 224 18% 14%;
+    --input: 224 18% 11%;
     --ring: 217 91% 60%;
 
-    /* Dashboard Specific */
-    --dashboard-bg: 222 47% 2%;
-    --glass-bg: 215 25% 8%;
-    --metric-card: 215 25% 10%;
-    --sidebar-active: 217 91% 15%;
+    /* Dashboard surfaces */
+    --dashboard-bg: 224 24% 3%;
+    --glass-bg: 224 22% 7%;
+    --metric-card: 224 20% 8%;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
-    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(142 76% 46%));
-    --gradient-glass: linear-gradient(135deg, hsl(215 25% 8% / 0.8), hsl(215 25% 12% / 0.6));
-    --gradient-metric: linear-gradient(135deg, hsl(215 25% 10%), hsl(215 25% 15%));
+    /* Sidebar — un punto más oscuro que el contenido para crear jerarquía */
+    --sidebar-background: 224 24% 5%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 224 24% 4%;
+    --sidebar-accent: 224 18% 10%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 224 18% 12%;
+    --sidebar-ring: 217 91% 60%;
+    --sidebar-active: 217 91% 14%;
 
-    /* Shadows */
-    --shadow-card: 0 4px 20px hsl(222 47% 2% / 0.3);
-    --shadow-metric: 0 8px 32px hsl(217 91% 60% / 0.1);
-    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.2);
-
-    /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-
+    /* Radius scale — UI más suave (producto 2025+) */
     --radius: 0.75rem;
 
-    /* Sidebar Professional */
-    --sidebar-background: 215 25% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 222 47% 3%;
-    --sidebar-accent: 215 25% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 25% 15%;
-    --sidebar-ring: 217 91% 60%;
+    /* Elevation — 3 niveles, sutiles, sin glow agresivo */
+    --shadow-xs: 0 1px 2px 0 hsl(224 24% 2% / 0.4);
+    --shadow-sm: 0 1px 3px 0 hsl(224 24% 2% / 0.5), 0 1px 2px -1px hsl(224 24% 2% / 0.3);
+    --shadow-md: 0 4px 6px -1px hsl(224 24% 2% / 0.55), 0 2px 4px -2px hsl(224 24% 2% / 0.4);
+    --shadow-lg: 0 10px 15px -3px hsl(224 24% 2% / 0.6), 0 4px 6px -4px hsl(224 24% 2% / 0.4);
+
+    /* Aliases legacy — no romper componentes que las consumen */
+    --shadow-card: var(--shadow-sm);
+    --shadow-metric: var(--shadow-sm);
+    --shadow-glow: 0 0 0 1px hsl(217 91% 60% / 0.15), 0 8px 24px -8px hsl(217 91% 60% / 0.25);
+
+    /* Motion tokens — sutil, profesional, respeta prefers-reduced-motion */
+    --duration-fast: 120ms;
+    --duration-base: 200ms;
+    --duration-slow: 320ms;
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    --transition-smooth: all var(--duration-base) var(--ease-standard);
+    --transition-bounce: all var(--duration-slow) var(--ease-spring);
+
+    /* Gradients — solo usar en CTA principal o branding */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 70%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 71% 55%));
+    --gradient-glass: linear-gradient(180deg, hsl(224 22% 8% / 0.8), hsl(224 22% 6% / 0.6));
+    --gradient-metric: linear-gradient(180deg, hsl(224 20% 9%), hsl(224 20% 7%));
   }
-  .theme { --animate-orbit: orbit calc(var(--duration)*1s) linear infinite; --animate-marquee: marquee var(--duration) infinite linear; --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+
+  .theme {
+    --animate-orbit: orbit calc(var(--duration) * 1s) linear infinite;
+    --animate-marquee: marquee var(--duration) infinite linear;
+    --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
   }
 }
 
+/* =========================================================================
+   Base reset
+   ========================================================================= */
+
 @layer base {
-  * {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  *,
+  ::after,
+  ::before {
     @apply border-border;
   }
 
-  html, body {
-    margin: 0 !important;
-    padding: 0 !important;
+  html {
+    margin: 0;
+    padding: 0;
+    background-color: hsl(var(--background));
     overflow-x: hidden;
-    box-sizing: border-box;
-    background-color: #000000 !important;
+    font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01', 'ss03';
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    line-height: 1;
-  }
-
-  html {
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    line-height: 1;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.5;
+    font-size: 14px;
   }
 
   #root {
-    margin: 0 !important;
-    padding: 0 !important;
-    background-color: #000000 !important;
+    margin: 0;
+    padding: 0;
+    background-color: hsl(var(--background));
+    isolation: isolate;
+  }
+
+  /* Tipografía — escala modular */
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
+  h1 { font-size: 1.875rem; letter-spacing: -0.025em; font-weight: 700; }
+  h2 { font-size: 1.5rem; }
+  h3 { font-size: 1.25rem; }
+  h4 { font-size: 1.125rem; }
+
+  p { line-height: 1.6; }
+
+  /* Focus ring consistente — accesibilidad AA */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: calc(var(--radius) - 2px);
+  }
+
+  /* Selection */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  /* Reduce motion para usuarios sensibles */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
+/* =========================================================================
+   Landing page — overrides específicos (NO afectan a la app del dashboard)
+   ========================================================================= */
+
+.landing-page {
+  position: relative;
+}
+
+.landing-page header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: hsl(var(--background));
+}
+
+/* =========================================================================
+   Components layer — utilidades reutilizables
+   ========================================================================= */
+
 @layer components {
-  /* Glass Morphism Effects */
-  .glass-card {
-    @apply bg-gradient-to-br from-glass-bg to-transparent backdrop-blur-xl border border-border/50;
-    box-shadow: var(--shadow-card);
+  /**
+   * Lienzo principal del SaaS — profundidad sin ruido visual.
+   * Radiales + rejilla fina (tendencia shell apps 2025–2026).
+   */
+  .app-canvas {
+    background-color: hsl(var(--dashboard-bg));
+    background-image:
+      radial-gradient(ellipse 100% 70% at 0% -30%, hsl(217 91% 60% / 0.14), transparent 52%),
+      radial-gradient(ellipse 70% 50% at 100% 0%, hsl(199 89% 48% / 0.09), transparent 48%),
+      radial-gradient(ellipse 60% 40% at 50% 100%, hsl(217 91% 60% / 0.06), transparent 55%),
+      linear-gradient(
+        to bottom,
+        hsl(var(--card) / 0.22) 0%,
+        transparent 28%,
+        transparent 100%
+      ),
+      linear-gradient(hsl(var(--border) / 0.45) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.45) 1px, transparent 1px);
+    background-size:
+      auto,
+      auto,
+      auto,
+      auto,
+      32px 32px,
+      32px 32px;
+    background-position: center top, center top, center bottom, center top, center, center;
   }
 
+  /* Glass morphism — sutil, profesional */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/60;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Metric card moderno — Linear/Stripe-like */
   .metric-card {
-    @apply bg-gradient-to-br from-metric-card to-transparent backdrop-blur-sm border border-border/30;
-    box-shadow: var(--shadow-metric);
+    @apply bg-card border border-border/60 rounded-2xl;
+    box-shadow: var(--shadow-xs);
     transition: var(--transition-smooth);
   }
 
   .metric-card:hover {
-    box-shadow: var(--shadow-glow);
-    transform: translateY(-2px);
+    border-color: hsl(var(--border));
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
   }
 
-  /* Interactive Elements */
+  /* Sidebar nav items */
   .nav-item {
-    @apply relative flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200;
+    @apply relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors;
   }
 
   .nav-item:hover {
-    @apply bg-sidebar-accent/50;
+    @apply bg-sidebar-accent/60;
   }
 
   .nav-item.active {
-    @apply bg-sidebar-active text-primary font-medium;
+    @apply bg-sidebar-active text-sidebar-primary font-medium;
   }
 
   .nav-item.active::before {
-    @apply absolute left-0 w-1 h-full bg-primary rounded-r-lg;
     content: '';
+    @apply absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-primary;
   }
 
-  /* Status Indicators */
+  /* Status badges — usar tokens del sistema */
   .status-indicator {
-    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium;
   }
 
   .status-success {
@@ -410,119 +303,141 @@ header:hover {
     @apply bg-destructive/10 text-destructive border border-destructive/20;
   }
 
-  /* Utility Classes */
+  .status-info {
+    @apply bg-info/10 text-info border border-info/20;
+  }
+
+  /* Text gradient — solo branding, no abusar */
   .text-gradient {
     @apply bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent;
   }
-
-  .border-gradient {
-    background: var(--gradient-glass);
-    border: 1px solid transparent;
-    background-clip: padding-box;
-  }
 }
 
-/* Animación de brillo para el logo */
-@keyframes glow {
-  0% {
-    filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.5));
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.1), 0 0 10px rgba(16, 185, 129, 0.3);
-  }
-  50% {
-    filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.8));
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.1), 0 0 20px rgba(16, 185, 129, 0.6);
-  }
-  100% {
-    filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.5));
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.1), 0 0 10px rgba(16, 185, 129, 0.3);
-  }
+/* =========================================================================
+   Animations
+   ========================================================================= */
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%) skew(-3deg); }
+  100% { transform: translateX(100%) skew(-3deg); }
 }
 
-/* Scrollbar personalizado - Diseño Futurista */
+@keyframes progressBar {
+  0% { width: 0%; background-position: 0% 50%; }
+  50% { width: 70%; background-position: 100% 50%; }
+  100% { width: 100%; background-position: 0% 50%; }
+}
+
+@keyframes slideInRight {
+  0% { transform: translateX(100%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+  0% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes fadeInUp {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInUp {
+  0% { transform: translateY(16px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.animate-shimmer { animation: shimmer 2s infinite; }
+.animate-progress-bar { animation: progressBar 2s var(--ease-standard) infinite; }
+.animate-slide-in-right { animation: slideInRight var(--duration-slow) var(--ease-emphasized); }
+.animate-slide-out-right { animation: slideOutRight var(--duration-base) var(--ease-standard); }
+.animate-fade-in-up { animation: fadeInUp var(--duration-base) var(--ease-standard); }
+.animate-slide-in-up { animation: slideInUp var(--duration-slow) var(--ease-emphasized); }
+
+/* Utility: line clamp 2 (ya viene en tailwind 3.3+, mantenemos por compat) */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* =========================================================================
+   Scrollbar — sobrio, casi invisible hasta hover (estándar 2026)
+   ========================================================================= */
+
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.5) rgba(31, 41, 55, 0.3);
+  scrollbar-color: hsl(var(--border)) transparent;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(31, 41, 55, 0.2);
-  border-radius: 10px;
-  margin: 4px 0;
+  background: transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, 
-    rgba(59, 130, 246, 0.8) 0%, 
-    rgba(147, 51, 234, 0.8) 50%, 
-    rgba(59, 130, 246, 0.8) 100%);
-  border-radius: 10px;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 0 8px rgba(59, 130, 246, 0.3);
-  transition: all 0.3s ease;
+  background: hsl(var(--border));
+  border-radius: 999px;
+  transition: background var(--duration-base) var(--ease-standard);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, 
-    rgba(59, 130, 246, 1) 0%, 
-    rgba(147, 51, 234, 1) 50%, 
-    rgba(59, 130, 246, 1) 100%);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 0 12px rgba(59, 130, 246, 0.5);
-  transform: scale(1.1);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:active {
-  background: linear-gradient(180deg, 
-    rgba(37, 99, 235, 1) 0%, 
-    rgba(126, 34, 206, 1) 50%, 
-    rgba(37, 99, 235, 1) 100%);
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 0 16px rgba(59, 130, 246, 0.7);
+  background: hsl(var(--muted-foreground) / 0.4);
 }
 
 .custom-scrollbar::-webkit-scrollbar-corner {
-  background: rgba(31, 41, 55, 0.2);
+  background: transparent;
 }
 
-/* Animación de pulso para el scrollbar */
-@keyframes scrollbarPulse {
+/* Scrollbar global de la app — sutil siempre */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.35);
+}
+
+/* =========================================================================
+   Logo glow — solo para LandingPage (preservado)
+   ========================================================================= */
+
+@keyframes glow {
   0% {
-    box-shadow: 
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 0 8px rgba(59, 130, 246, 0.3);
+    filter: drop-shadow(0 0 12px hsl(var(--primary) / 0.5));
+    text-shadow: 2px 2px 4px hsl(var(--background) / 0.1), 0 0 10px hsl(var(--primary) / 0.3);
   }
   50% {
-    box-shadow: 
-      inset 0 1px 0 rgba(255, 255, 255, 0.2),
-      0 0 12px rgba(59, 130, 246, 0.5);
+    filter: drop-shadow(0 0 20px hsl(var(--primary) / 0.8));
+    text-shadow: 2px 2px 4px hsl(var(--background) / 0.1), 0 0 20px hsl(var(--primary) / 0.6);
   }
   100% {
-    box-shadow: 
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 0 8px rgba(59, 130, 246, 0.3);
+    filter: drop-shadow(0 0 12px hsl(var(--primary) / 0.5));
+    text-shadow: 2px 2px 4px hsl(var(--background) / 0.1), 0 0 10px hsl(var(--primary) / 0.3);
   }
 }
 
-.custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  animation: scrollbarPulse 2s ease-in-out infinite;
-}
-
-/* Optimización de rendimiento para scroll */
-.custom-scrollbar {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-  will-change: scroll-position;
-}
-
-/* Efecto de desenfoque removido para evitar manchas visuales */
+/* =========================================================================
+   Marquee + Orbit (preservados — los usa la landing)
+   ========================================================================= */
 
 @keyframes orbit {
   0% {
@@ -541,21 +456,13 @@ header:hover {
 }
 
 @keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
-  }
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - var(--gap))); }
 }
 
 @keyframes marquee-vertical {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(calc(-100% - var(--gap)));
-  }
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-100% - var(--gap))); }
 }
 
 .animate-marquee {
@@ -568,12 +475,10 @@ header:hover {
   will-change: transform;
 }
 
-/* Asegurar que las animaciones funcionen */
 [data-marquee] {
-  animation-play-state: running !important;
+  animation-play-state: running;
 }
 
-/* Debug: hacer visible las animaciones */
 .animate-marquee,
 .animate-marquee-vertical {
   animation-fill-mode: both;

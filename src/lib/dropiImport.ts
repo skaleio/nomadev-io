@@ -1,13 +1,7 @@
 import * as XLSX from "xlsx";
-import type { Json } from "@/integrations/supabase/types";
+import type { DropiStatusBucket, Json } from "@/integrations/supabase/types";
 
-export type DropiStatusBucket =
-  | "cancelled"
-  | "delivered"
-  | "return_flow"
-  | "issue"
-  | "in_transit"
-  | "pending";
+export type { DropiStatusBucket };
 
 export type DropiOrderRow = {
   dropi_numeric_id: number;
