@@ -75,11 +75,11 @@ export default function ShopifyConnectPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+              <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
               <h2 className="text-2xl font-bold mb-2">¡Conexión Exitosa!</h2>
               <p className="text-muted-foreground mb-4">
                 Tu tienda se ha conectado correctamente. Redirigiendo al dashboard...
@@ -95,20 +95,20 @@ export default function ShopifyConnectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-gray-900/90 border-gray-700 backdrop-blur-sm shadow-2xl">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-card border-border backdrop-blur-sm shadow-2xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-              <ShoppingBag className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+              <ShoppingBag className="w-8 h-8 text-primary-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-white">Conectar Tienda Shopify</CardTitle>
-          <p className="text-gray-300">
+          <CardTitle className="text-2xl font-bold text-foreground">Conectar Tienda Shopify</CardTitle>
+          <p className="text-muted-foreground">
             Conecta tu tienda Shopify para sincronizar productos, pedidos y métricas
           </p>
-          <div className="text-left text-sm text-gray-400 mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700">
-            <p className="font-medium text-gray-300 mb-2">Pasos:</p>
+          <div className="text-left text-sm text-muted-foreground mt-3 p-3 bg-muted/50 rounded-lg border border-border">
+            <p className="font-medium text-foreground mb-2">Pasos:</p>
             <ol className="list-decimal list-inside space-y-1">
               <li>Ingresa el dominio de tu tienda (ej: mi-tienda).</li>
               <li>Haz clic en &quot;Conectar Tienda&quot;.</li>
@@ -125,9 +125,9 @@ export default function ShopifyConnectPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           <div className="space-y-2">
-            <Label htmlFor="shop-domain" className="text-white font-medium">Dominio de tu tienda</Label>
+            <Label htmlFor="shop-domain" className="text-foreground font-medium">Dominio de tu tienda</Label>
             <div className="flex gap-2">
               <Input
                 id="shop-domain"
@@ -135,19 +135,18 @@ export default function ShopifyConnectPage() {
                 value={shopDomain}
                 onChange={(e) => setShopDomain(e.target.value)}
                 disabled={loading}
-                className="bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:border-green-500"
               />
-              <span className="flex items-center text-gray-400">.myshopify.com</span>
+              <span className="flex items-center text-muted-foreground">.myshopify.com</span>
             </div>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-muted-foreground">
               Solo ingresa el nombre de tu tienda (sin .myshopify.com)
             </p>
           </div>
 
-          <Button 
+          <Button
             onClick={handleConnectShopify}
             disabled={loading || !shopDomain.trim()}
-            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 rounded-lg transition-all duration-200 transform hover:scale-105"
+            className="w-full font-semibold py-3"
           >
             {loading ? (
               <>
@@ -163,10 +162,10 @@ export default function ShopifyConnectPage() {
           </Button>
 
           <div className="text-center">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => navigate('/shopify')}
-              className="text-gray-400 hover:text-white hover:bg-gray-800"
+              className="text-muted-foreground hover:text-foreground"
             >
               ← Volver al Dashboard
             </Button>

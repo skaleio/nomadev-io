@@ -14,11 +14,11 @@ import RippleGrid from '@/components/RippleGrid';
 const PasswordRequirement = ({ met, text }: { met: boolean; text: string }) => (
   <div className="flex items-center gap-2 text-xs">
     {met ? (
-      <CheckCircle className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+      <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
     ) : (
-      <XCircle className="h-4 w-4 text-gray-500 flex-shrink-0" />
+      <XCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
     )}
-    <span className={met ? 'text-emerald-300' : 'text-gray-400'}>{text}</span>
+    <span className={met ? 'text-success' : 'text-muted-foreground'}>{text}</span>
   </div>
 );
 
@@ -121,7 +121,7 @@ const RegisterPage = () => {
             variant="ghost"
             size="sm"
             onClick={() => navigate('/')}
-            className="text-emerald-300 hover:text-white hover:bg-emerald-500/20 transition-all duration-200 backdrop-blur-sm"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 backdrop-blur-sm"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
@@ -135,33 +135,21 @@ const RegisterPage = () => {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
           <div className="mb-8">
-            <h1 
-              className="text-5xl font-black text-emerald-400 hover:text-emerald-300 transition-all duration-300 cursor-pointer tracking-wider uppercase"
-              style={{
-                fontFamily: "'Orbitron', 'Arial Black', sans-serif",
-                fontWeight: 900,
-                letterSpacing: '0.15em',
-                textShadow: '0 0 20px rgba(16, 185, 129, 0.5)',
-                transform: 'skew(-3deg)',
-                display: 'inline-block',
-                filter: 'drop-shadow(0 0 20px rgba(16, 185, 129, 0.8))',
-                animation: 'glow 3s ease-in-out infinite alternate'
-              }}
-            >
+            <span className="font-orbitron wordmark-glow text-5xl uppercase tracking-[0.15em] cursor-pointer">
               NOMADEV.IO
-            </h1>
+            </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">
+          <h2 className="text-2xl font-bold text-foreground mb-2">
             Crear Cuenta
           </h2>
-          <p className="text-gray-300 text-sm">
+          <p className="text-muted-foreground text-sm">
             Regístrate para comenzar a usar NOMADEV.IO
           </p>
         </div>
 
-        <Card className="shadow-2xl border border-emerald-500/30 bg-gray-900/95 backdrop-blur-xl">
+        <Card className="shadow-2xl border-border bg-card/95 backdrop-blur-xl">
           <CardHeader className="text-center pb-6 pt-8">
-            <CardDescription className="text-gray-300 text-base">
+            <CardDescription className="text-muted-foreground text-base">
               Completa el formulario para crear tu cuenta
             </CardDescription>
           </CardHeader>
@@ -175,7 +163,7 @@ const RegisterPage = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <Label htmlFor="firstName" className="text-emerald-200 font-medium text-sm">Nombre</Label>
+                  <Label htmlFor="firstName" className="text-muted-foreground font-medium text-sm">Nombre</Label>
                   <Input
                     id="firstName"
                     name="firstName"
@@ -184,12 +172,12 @@ const RegisterPage = () => {
                     onChange={handleChange}
                     required
                     placeholder="Tu nombre"
-                    className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
+                    className="h-12"
                   />
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="lastName" className="text-emerald-200 font-medium text-sm">Apellido</Label>
+                  <Label htmlFor="lastName" className="text-muted-foreground font-medium text-sm">Apellido</Label>
                   <Input
                     id="lastName"
                     name="lastName"
@@ -198,13 +186,13 @@ const RegisterPage = () => {
                     onChange={handleChange}
                     required
                     placeholder="Tu apellido"
-                    className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
+                    className="h-12"
                   />
                 </div>
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-emerald-200 font-medium text-sm">Correo electrónico</Label>
+                <Label htmlFor="email" className="text-muted-foreground font-medium text-sm">Correo electrónico</Label>
                 <Input
                   id="email"
                   name="email"
@@ -213,12 +201,12 @@ const RegisterPage = () => {
                   onChange={handleChange}
                   required
                   placeholder="tu@ejemplo.com"
-                  className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
+                  className="h-12"
                 />
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="password" className="text-emerald-200 font-medium text-sm">Contraseña</Label>
+                <Label htmlFor="password" className="text-muted-foreground font-medium text-sm">Contraseña</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -230,12 +218,12 @@ const RegisterPage = () => {
                     onBlur={() => setPasswordFocused(false)}
                     required
                     placeholder="Crea una contraseña segura"
-                    className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12 pr-10"
+                    className="h-12 pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -243,26 +231,26 @@ const RegisterPage = () => {
 
                 {/* Requisitos de contraseña */}
                 {(passwordFocused || formData.password.length > 0) && (
-                  <div className="bg-gray-800/50 border border-emerald-500/20 rounded-lg p-4 space-y-2">
-                    <p className="text-xs font-semibold text-gray-300 mb-2">La contraseña debe contener:</p>
+                  <div className="bg-muted/50 border border-border/50 rounded-lg p-4 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">La contraseña debe contener:</p>
                     <div className="grid grid-cols-1 gap-2">
-                      <PasswordRequirement 
+                      <PasswordRequirement
                         met={passwordRequirements.minLength}
                         text="Mínimo 8 caracteres"
                       />
-                      <PasswordRequirement 
+                      <PasswordRequirement
                         met={passwordRequirements.hasUpperCase}
                         text="Una letra mayúscula (A-Z)"
                       />
-                      <PasswordRequirement 
+                      <PasswordRequirement
                         met={passwordRequirements.hasLowerCase}
                         text="Una letra minúscula (a-z)"
                       />
-                      <PasswordRequirement 
+                      <PasswordRequirement
                         met={passwordRequirements.hasNumber}
                         text="Un número (0-9)"
                       />
-                      <PasswordRequirement 
+                      <PasswordRequirement
                         met={passwordRequirements.hasSpecialChar}
                         text="Un carácter especial (!@#$%...)"
                       />
@@ -272,7 +260,7 @@ const RegisterPage = () => {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="confirmPassword" className="text-emerald-200 font-medium text-sm">Confirmar contraseña</Label>
+                <Label htmlFor="confirmPassword" className="text-muted-foreground font-medium text-sm">Confirmar contraseña</Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
@@ -282,18 +270,18 @@ const RegisterPage = () => {
                     onChange={handleChange}
                     required
                     placeholder="Repite tu contraseña"
-                    className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12 pr-10"
+                    className="h-12 pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-400 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
                 {formData.confirmPassword.length > 0 && formData.password !== formData.confirmPassword && (
-                  <p className="text-xs text-red-400 flex items-center gap-1">
+                  <p className="text-xs text-destructive flex items-center gap-1">
                     <XCircle className="h-3 w-3" />
                     Las contraseñas no coinciden
                   </p>
@@ -302,7 +290,7 @@ const RegisterPage = () => {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold py-4 h-12 shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-12 font-semibold text-base"
                 disabled={isLoading || !isPasswordValid || formData.password !== formData.confirmPassword}
               >
                 {isLoading ? (
@@ -314,9 +302,9 @@ const RegisterPage = () => {
                   'Crear Cuenta'
                 )}
               </Button>
-              
+
               {formData.password.length > 0 && !isPasswordValid && (
-                <p className="text-xs text-amber-400 text-center">
+                <p className="text-xs text-warning text-center">
                   Completa todos los requisitos de contraseña para continuar
                 </p>
               )}
@@ -325,10 +313,10 @@ const RegisterPage = () => {
             {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-emerald-500/30"></div>
+                <div className="w-full border-t border-border/50"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-gray-900 text-emerald-300 font-medium">O CONTINUAR CON</span>
+                <span className="px-4 bg-card text-muted-foreground font-medium">O CONTINUAR CON</span>
               </div>
             </div>
 
@@ -353,23 +341,23 @@ const RegisterPage = () => {
             </Button>
 
             <div className="mt-8 text-center space-y-4">
-              <div className="flex items-center justify-center space-x-4 text-emerald-300 text-sm">
+              <div className="flex items-center justify-center space-x-4 text-muted-foreground text-sm">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                   <span>Datos Seguros</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                   <span>Encriptado</span>
                 </div>
               </div>
-              
-              <div className="border-t border-emerald-500/30 pt-4">
-                <p className="text-sm text-emerald-200">
+
+              <div className="border-t border-border/40 pt-4">
+                <p className="text-sm text-muted-foreground">
                   ¿Ya tienes una cuenta?{' '}
                   <Link
                     to="/login"
-                    className="font-medium text-emerald-300 hover:text-emerald-200 transition-colors duration-200"
+                    className="font-medium text-primary hover:text-primary/80 transition-colors duration-200"
                   >
                     Inicia sesión aquí
                   </Link>

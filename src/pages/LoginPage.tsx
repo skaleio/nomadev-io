@@ -74,28 +74,28 @@ const LoginPage = () => {
           variant="ghost"
           size="sm"
           onClick={() => navigate('/')}
-          className="text-emerald-300 hover:text-white hover:bg-emerald-500/20 transition-all duration-200 backdrop-blur-sm"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 backdrop-blur-sm"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
       </div>
 
-      {/* Sticky Header - Only appears on scroll with white background */}
+      {/* Sticky Header - Only appears on scroll */}
       <header
-        className={`fixed top-0 left-0 w-full z-50 bg-white shadow-md transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 w-full z-50 bg-background/90 backdrop-blur-md border-b border-border/40 shadow-sm transition-all duration-300 ease-in-out ${
           isHeaderVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
         }`}
       >
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
-          <Link to="/" className="text-lg font-bold text-gray-800">
+          <Link to="/" className="text-lg font-bold text-foreground">
             NOMADEV.IO
           </Link>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/')}
-            className="text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver
@@ -108,33 +108,21 @@ const LoginPage = () => {
         <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <div className="mb-8">
-            <h1 
-              className="text-5xl font-black text-emerald-400 hover:text-emerald-300 transition-all duration-300 cursor-pointer tracking-wider uppercase"
-              style={{
-                fontFamily: "'Orbitron', 'Arial Black', sans-serif",
-                fontWeight: 900,
-                letterSpacing: '0.15em',
-                textShadow: '0 0 20px rgba(16, 185, 129, 0.5)',
-                transform: 'skew(-3deg)',
-                display: 'inline-block',
-                filter: 'drop-shadow(0 0 20px rgba(16, 185, 129, 0.8))',
-                animation: 'glow 3s ease-in-out infinite alternate'
-              }}
-            >
+            <span className="font-orbitron wordmark-glow text-5xl uppercase tracking-[0.15em] cursor-pointer">
               NOMADEV.IO
-            </h1>
+            </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">
+          <h2 className="text-2xl font-bold text-foreground mb-2">
             Iniciar Sesión
           </h2>
-          <p className="text-gray-300 text-sm">
+          <p className="text-muted-foreground text-sm">
             Accede a tu cuenta de NOMADEV.IO
           </p>
         </div>
 
-        <Card className="shadow-2xl border border-emerald-500/30 bg-gray-900/95 backdrop-blur-xl">
+        <Card className="shadow-2xl border-border bg-card/95 backdrop-blur-xl">
           <CardHeader className="text-center pb-6 pt-8">
-            <CardDescription className="text-gray-300 text-base">
+            <CardDescription className="text-muted-foreground text-base">
               Ingresa tus credenciales para acceder a tu cuenta
             </CardDescription>
           </CardHeader>
@@ -147,7 +135,7 @@ const LoginPage = () => {
               )}
 
               <div className="space-y-3">
-                <Label htmlFor="email" className="text-emerald-200 font-medium text-sm">Correo electrónico</Label>
+                <Label htmlFor="email" className="text-muted-foreground font-medium text-sm">Correo electrónico</Label>
                 <Input
                   id="email"
                   type="email"
@@ -156,12 +144,12 @@ const LoginPage = () => {
                   required
                   autoComplete="email"
                   placeholder="tu@ejemplo.com"
-                  className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
+                  className="h-12"
                 />
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="password" className="text-emerald-200 font-medium text-sm">Contraseña</Label>
+                <Label htmlFor="password" className="text-muted-foreground font-medium text-sm">Contraseña</Label>
                 <Input
                   id="password"
                   type="password"
@@ -170,13 +158,13 @@ const LoginPage = () => {
                   required
                   autoComplete="current-password"
                   placeholder="Tu contraseña"
-                  className="bg-gray-800/50 border-emerald-500/30 text-white placeholder-gray-400 focus:border-emerald-400 focus:ring-emerald-400 focus:bg-gray-800 h-12"
+                  className="h-12"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold py-4 h-12 shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 text-base"
+                className="w-full h-12 font-semibold text-base"
                 disabled={isSubmitting || !email || !password}
               >
                 {isSubmitting ? (
@@ -193,10 +181,10 @@ const LoginPage = () => {
             {/* Divider */}
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-emerald-500/30"></div>
+                <div className="w-full border-t border-border/50"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-gray-900 text-emerald-300 font-medium">O CONTINUAR CON</span>
+                <span className="px-4 bg-card text-muted-foreground font-medium">O CONTINUAR CON</span>
               </div>
             </div>
 
@@ -225,23 +213,23 @@ const LoginPage = () => {
             </Button>
 
             <div className="mt-8 text-center space-y-4">
-              <div className="flex items-center justify-center space-x-4 text-emerald-300 text-sm">
+              <div className="flex items-center justify-center space-x-4 text-muted-foreground text-sm">
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-success rounded-full animate-pulse"></div>
                   <span>Sistema Seguro</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-teal-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                   <span>SSL Encriptado</span>
                 </div>
               </div>
-              
-              <div className="border-t border-emerald-500/30 pt-4">
-                <p className="text-sm text-emerald-200">
+
+              <div className="border-t border-border/40 pt-4">
+                <p className="text-sm text-muted-foreground">
                   ¿No tienes una cuenta?{' '}
                   <Link
                     to="/register"
-                    className="font-medium text-emerald-300 hover:text-emerald-200 transition-colors duration-200"
+                    className="font-medium text-primary hover:text-primary/80 transition-colors duration-200"
                   >
                     Regístrate aquí
                   </Link>

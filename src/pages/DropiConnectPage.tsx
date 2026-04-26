@@ -54,13 +54,13 @@ export default function DropiConnectPage() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[50vh] p-4">
-          <Card className="w-full max-w-md bg-gray-900/90 border-gray-700">
+          <Card className="w-full max-w-md bg-card border-border">
             <CardContent className="pt-6">
               <div className="text-center">
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Conexión exitosa</h2>
-                <p className="text-gray-300 mb-4">Dropi conectado. Redirigiendo...</p>
-                <Loader2 className="w-6 h-6 animate-spin mx-auto text-amber-400" />
+                <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-foreground mb-2">Conexión exitosa</h2>
+                <p className="text-muted-foreground mb-4">Dropi conectado. Redirigiendo...</p>
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-warning" />
               </div>
             </CardContent>
           </Card>
@@ -72,15 +72,15 @@ export default function DropiConnectPage() {
   return (
     <DashboardLayout>
     <div className="flex items-center justify-center min-h-[50vh] p-4">
-      <Card className="w-full max-w-md bg-gray-900/90 border-gray-700 backdrop-blur-sm shadow-2xl">
+      <Card className="w-full max-w-md bg-card border-border backdrop-blur-sm shadow-2xl">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-full flex items-center justify-center">
-              <Truck className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 bg-warning rounded-full flex items-center justify-center">
+              <Truck className="w-8 h-8 text-warning-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-white">Conectar Dropi</CardTitle>
-          <p className="text-gray-300 text-sm">
+          <CardTitle className="text-2xl font-bold text-foreground">Conectar Dropi</CardTitle>
+          <p className="text-muted-foreground text-sm">
             Usa las credenciales de tu cuenta Dropi para logística y envíos
           </p>
         </CardHeader>
@@ -92,7 +92,7 @@ export default function DropiConnectPage() {
             </Alert>
           )}
           <div className="space-y-2">
-            <Label htmlFor="dropi-email" className="text-white font-medium">
+            <Label htmlFor="dropi-email" className="text-foreground font-medium">
               Email
             </Label>
             <Input
@@ -102,11 +102,10 @@ export default function DropiConnectPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
-              className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dropi-password" className="text-white font-medium">
+            <Label htmlFor="dropi-password" className="text-foreground font-medium">
               Contraseña
             </Label>
             <Input
@@ -116,7 +115,6 @@ export default function DropiConnectPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
-              className="bg-gray-800 border-gray-600 text-white placeholder-gray-400"
             />
           </div>
           <div className="flex items-center space-x-2">
@@ -126,14 +124,14 @@ export default function DropiConnectPage() {
               onCheckedChange={(c) => setUseTest(!!c)}
               disabled={loading}
             />
-            <Label htmlFor="dropi-test" className="text-gray-300 text-sm cursor-pointer">
+            <Label htmlFor="dropi-test" className="text-muted-foreground text-sm cursor-pointer">
               Usar entorno de pruebas (test-api.dropi.co)
             </Label>
           </div>
           <Button
             onClick={handleConnect}
             disabled={loading || !email.trim() || !password}
-            className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-semibold py-3"
+            className="w-full font-semibold py-3"
           >
             {loading ? (
               <>
@@ -147,14 +145,14 @@ export default function DropiConnectPage() {
               </>
             )}
           </Button>
-          <Collapsible className="rounded-lg border border-amber-500/30 bg-amber-950/20">
-            <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-amber-200 hover:text-amber-100">
+          <Collapsible className="rounded-lg border border-warning/30 bg-warning/5">
+            <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-warning hover:text-warning/80">
               <span className="flex items-center gap-2">
                 <HelpCircle className="h-4 w-4" />
                 ¿No tienes acceso a la API? / Acceso denegado
               </span>
             </CollapsibleTrigger>
-            <CollapsibleContent className="px-3 pb-3 pt-0 text-xs text-amber-200/90 space-y-2">
+            <CollapsibleContent className="px-3 pb-3 pt-0 text-xs text-muted-foreground space-y-2">
               <p>Si Dropi devuelve &quot;Access denied&quot;, suele ser porque la cuenta aún no tiene habilitado el acceso por API. Puedes hacer esto mientras tanto:</p>
               <ul className="list-disc list-inside space-y-1 ml-1">
                 <li>En la web de Dropi, entra a <strong>Mis Integraciones</strong> y completa el campo <strong>Nombre de Tienda</strong> (y guarda). A veces es necesario para que den el acceso.</li>
@@ -167,7 +165,7 @@ export default function DropiConnectPage() {
             <Button
               variant="ghost"
               onClick={() => navigate("/dropi")}
-              className="text-gray-400 hover:text-white hover:bg-gray-800"
+              className="text-muted-foreground hover:text-foreground"
             >
               ← Volver a Dropi
             </Button>

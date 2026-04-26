@@ -802,100 +802,138 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         </CardContent>
       </Card>
 
-      {/* ── Rendimiento por categoría (Excel) ── */}
+      {/* ── Rendimiento por categoría ── */}
       {productInsights.general && (
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">Rendimiento por categoría</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Datos del rango de fechas y filtros de región / logística. Categorías según columna importada del Excel. Meta se prorratea por volumen en cada categoría; en &quot;General&quot; se usa el gasto completo del rango.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            {(() => {
-              const g = productInsights.general;
-              const list = productInsights.byProduct;
-              const singleCategory =
-                list.length === 1 && list[0].pedidos === g.pedidos ? list[0] : null;
-              const tiles = singleCategory
-                ? [{ ...g, label: `General · ${singleCategory.label}`, __single: true as const }]
-                : [g, ...list];
-              return tiles.map((ins) => {
-                const isGeneralOnly = "label" in ins && ins.label.startsWith("General (");
-                const isMergedSingle = "__single" in ins && ins.__single;
-                const isHighlight = isGeneralOnly || isMergedSingle;
-                const key =
-                  isMergedSingle && "label" in ins
-                    ? `merged-${String(ins.label)}`
-                    : ins.label.startsWith("General (")
-                      ? "__general__"
-                      : ins.label;
-                return (
-                  <Card
-                    key={key}
-                    className={isHighlight ? "border-primary/25 bg-primary/[0.03]" : undefined}
-                  >
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base leading-snug">
-                        {isMergedSingle && "label" in ins
-                          ? ins.label
-                          : isGeneralOnly
-                            ? "Resumen general"
-                            : ins.label}
-                      </CardTitle>
-                      {isGeneralOnly ? (
-                        <p className="text-xs text-muted-foreground">Todas las categorías en este periodo y filtros.</p>
-                      ) : isMergedSingle ? (
-                        <p className="text-xs text-muted-foreground">Única categoría en este periodo; mismos totales que el resumen general.</p>
-                      ) : null}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-lg border border-border/40 bg-muted/20 p-4 text-sm">
-                        {[
-                          { label: "Pedidos", value: String(ins.pedidos) },
-                          { label: "Precio promedio", value: formatMoney(ins.precioPromedio) },
-                          { label: "Entrega", value: `${ins.pctEntregados}%` },
-                          { label: "Devolución", value: `${ins.pctDevolucion}%` },
-                          { label: "Cancelados", value: `${ins.pctCancelados}%` },
-                          { label: "CPA", value: ins.cpa != null ? formatMoney(ins.cpa) : "—" },
-                        ].map((item) => (
-                          <div key={item.label}>
-                            <div className="text-xs text-muted-foreground mb-0.5">{item.label}</div>
-                            <div className="font-semibold text-foreground tabular-nums">{item.value}</div>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <MetricCard
-                          title="Breakeven / pedido"
-                          value={ins.breakevenPorPedido != null ? formatMoney(ins.breakevenPorPedido) : "—"}
-                          icon={Scale}
-                          description="Coste variable medio entregado + Meta atribuida / entregado"
-                          loading={loading}
-                        />
-                        <MetricCard
-                          title="Profit neto / pedido"
-                          value={ins.profitNetoPorPedido != null ? formatMoney(ins.profitNetoPorPedido) : "—"}
-                          icon={DollarSign}
-                          color="success"
-                          description="Ganancia media entregado − Meta atribuida por entregado"
-                          loading={loading}
-                        />
-                        <MetricCard
-                          title="Precio sugerido"
-                          value={ins.precioSugerido != null ? formatMoney(ins.precioSugerido) : "—"}
-                          icon={Target}
-                          description="Breakeven × 1,30 (margen orientativo)"
-                          loading={loading}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              });
-            })()}
-          </div>
-        </div>
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/40 bg-gradient-to-b from-muted/25 to-transparent">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle className="text-lg font-semibold tracking-tight text-foreground">
+                  Rendimiento por categoría
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Usa el rango de fechas y filtros de región / logística. Las categorías provienen de la columna importada en el archivo.
+                  Meta se prorratea por volumen en cada categoría; en &quot;General&quot; se usa el gasto completo del rango.
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {(() => {
+                const g = productInsights.general;
+                const list = productInsights.byProduct;
+                const singleCategory =
+                  list.length === 1 && list[0].pedidos === g.pedidos ? list[0] : null;
+                const tiles = singleCategory
+                  ? [{ ...g, label: `General · ${singleCategory.label}`, __single: true as const }]
+                  : [g, ...list];
+
+                return tiles.map((ins) => {
+                  const isGeneralOnly = "label" in ins && ins.label.startsWith("General (");
+                  const isMergedSingle = "__single" in ins && ins.__single;
+                  const isHighlight = isGeneralOnly || isMergedSingle;
+                  const wide = tiles.length === 1 || (isHighlight && tiles.length <= 2);
+                  const key =
+                    isMergedSingle && "label" in ins
+                      ? `merged-${String(ins.label)}`
+                      : ins.label.startsWith("General (")
+                        ? "__general__"
+                        : ins.label;
+
+                  return (
+                    <Card
+                      key={key}
+                      className={[
+                        "relative overflow-hidden",
+                        isHighlight ? "border-primary/25 bg-primary/[0.035]" : "",
+                        wide ? "lg:col-span-2 xl:col-span-3" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <div
+                        className="pointer-events-none absolute inset-x-0 top-0 h-20 opacity-70"
+                        style={{
+                          background:
+                            isHighlight
+                              ? "radial-gradient(1200px 180px at 20% 0%, rgba(45,212,191,0.14), transparent 60%)"
+                              : "radial-gradient(900px 160px at 20% 0%, rgba(148,163,184,0.10), transparent 55%)",
+                        }}
+                        aria-hidden
+                      />
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base leading-snug">
+                          {isMergedSingle && "label" in ins
+                            ? ins.label
+                            : isGeneralOnly
+                              ? "Resumen general"
+                              : ins.label}
+                        </CardTitle>
+                        {isGeneralOnly ? (
+                          <p className="text-xs text-muted-foreground">
+                            Todas las categorías en este periodo y filtros.
+                          </p>
+                        ) : isMergedSingle ? (
+                          <p className="text-xs text-muted-foreground">
+                            Única categoría en este periodo; mismos totales que el resumen general.
+                          </p>
+                        ) : null}
+                      </CardHeader>
+
+                      <CardContent className={wide ? "grid gap-4 lg:grid-cols-[1.1fr_0.9fr]" : "space-y-4"}>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-xl border border-border/40 bg-muted/15 p-4 text-sm">
+                          {[
+                            { label: "Pedidos", value: String(ins.pedidos) },
+                            { label: "Precio promedio", value: formatMoney(ins.precioPromedio) },
+                            { label: "Entrega", value: `${ins.pctEntregados}%` },
+                            { label: "Devolución", value: `${ins.pctDevolucion}%` },
+                            { label: "Cancelados", value: `${ins.pctCancelados}%` },
+                            { label: "CPA", value: ins.cpa != null ? formatMoney(ins.cpa) : "—" },
+                          ].map((item) => (
+                            <div key={item.label} className="min-w-0">
+                              <div className="text-[11px] font-medium text-muted-foreground mb-1">
+                                {item.label}
+                              </div>
+                              <div className="font-semibold text-foreground tabular-nums truncate">
+                                {item.value}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <MetricCard
+                            title="Breakeven / pedido"
+                            value={ins.breakevenPorPedido != null ? formatMoney(ins.breakevenPorPedido) : "—"}
+                            icon={Scale}
+                            description="Coste variable medio entregado + Meta atribuida / entregado"
+                            loading={loading}
+                          />
+                          <MetricCard
+                            title="Profit neto / pedido"
+                            value={ins.profitNetoPorPedido != null ? formatMoney(ins.profitNetoPorPedido) : "—"}
+                            icon={DollarSign}
+                            color="success"
+                            description="Ganancia media entregado − Meta atribuida por entregado"
+                            loading={loading}
+                          />
+                          <MetricCard
+                            title="Precio sugerido"
+                            value={ins.precioSugerido != null ? formatMoney(ins.precioSugerido) : "—"}
+                            icon={Target}
+                            description="Breakeven × 1,30 (margen orientativo)"
+                            loading={loading}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                });
+              })()}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ── Lista de pedidos ── */}

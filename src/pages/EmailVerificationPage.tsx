@@ -69,7 +69,7 @@ export const EmailVerificationPage = () => {
             variant="ghost"
             size="sm"
             onClick={() => navigate('/')}
-            className="text-emerald-300 hover:text-white hover:bg-emerald-500/20 transition-all duration-200 backdrop-blur-sm"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all duration-200 backdrop-blur-sm"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver al inicio
@@ -79,79 +79,78 @@ export const EmailVerificationPage = () => {
 
       {/* Main Content */}
       <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-20">
-        <Card className="w-full max-w-2xl shadow-2xl border border-emerald-500/30 bg-gray-900/95 backdrop-blur-xl">
+        <Card className="w-full max-w-2xl shadow-2xl border-border bg-card/95 backdrop-blur-xl">
           <CardHeader className="text-center pb-6 pt-12">
-            {/* Email Icon with Animation */}
             <div className="mx-auto mb-6 relative">
-              <div className="absolute inset-0 bg-emerald-500/20 rounded-full blur-xl animate-pulse"></div>
-              <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 mx-auto shadow-lg">
-                <Mail className="h-10 w-10 text-white" />
+              <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl animate-pulse"></div>
+              <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-primary mx-auto shadow-lg">
+                <Mail className="h-10 w-10 text-primary-foreground" />
               </div>
             </div>
 
-            <CardTitle className="text-4xl font-bold text-white mb-3">
-              ¡Revisa tu Correo! 📬
+            <CardTitle className="text-4xl font-bold text-foreground mb-3">
+              Revisa tu Correo
             </CardTitle>
-            <CardDescription className="text-gray-300 text-lg">
+            <CardDescription className="text-muted-foreground text-lg">
               Hemos enviado un enlace de verificación a:
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-6 pb-12">
             {/* Email Display */}
-            <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-4">
-              <p className="text-emerald-300 font-semibold text-lg text-center break-all">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+              <p className="text-primary font-semibold text-lg text-center break-all">
                 {email}
               </p>
             </div>
 
             {/* Steps */}
-            <div className="space-y-4 bg-gray-800/50 rounded-lg p-6 border border-gray-700">
-              <h3 className="text-white font-semibold text-center mb-4">
+            <div className="space-y-4 bg-muted/50 rounded-lg p-6 border border-border">
+              <h3 className="text-foreground font-semibold text-center mb-4">
                 Sigue estos pasos para continuar:
               </h3>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
-                    <span className="text-emerald-400 font-semibold text-sm">1</span>
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/30">
+                    <span className="text-primary font-semibold text-sm">1</span>
                   </div>
                   <div>
-                    <p className="text-gray-200 font-medium">Revisa tu bandeja de entrada</p>
-                    <p className="text-gray-400 text-sm">Busca un correo de NOMADEV</p>
+                    <p className="text-foreground font-medium">Revisa tu bandeja de entrada</p>
+                    <p className="text-muted-foreground text-sm">Busca un correo de NOMADEV</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
-                    <span className="text-emerald-400 font-semibold text-sm">2</span>
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/30">
+                    <span className="text-primary font-semibold text-sm">2</span>
                   </div>
                   <div>
-                    <p className="text-gray-200 font-medium">Haz clic en el enlace de verificación</p>
-                    <p className="text-gray-400 text-sm">El enlace es válido por 24 horas</p>
+                    <p className="text-foreground font-medium">Haz clic en el enlace de verificación</p>
+                    <p className="text-muted-foreground text-sm">El enlace es válido por 24 horas</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40">
-                    <span className="text-emerald-400 font-semibold text-sm">3</span>
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/30">
+                    <span className="text-primary font-semibold text-sm">3</span>
                   </div>
                   <div>
-                    <p className="text-gray-200 font-medium">¡Listo! Ya puedes iniciar sesión</p>
-                    <p className="text-gray-400 text-sm">Serás redirigido automáticamente</p>
+                    <p className="text-foreground font-medium">Ya puedes iniciar sesión</p>
+                    <p className="text-muted-foreground text-sm">Serás redirigido automáticamente</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* What's Next Banner */}
-            <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-6">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-6">
               <div className="flex items-center gap-3 mb-3">
-                <Sparkles className="h-6 w-6 text-emerald-400 flex-shrink-0" />
-                <h3 className="text-white font-semibold text-lg">Después de verificar</h3>
+                <Sparkles className="h-6 w-6 text-primary flex-shrink-0" />
+                <h3 className="text-foreground font-semibold text-lg">Después de verificar</h3>
               </div>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Te guiaremos paso a paso para conectar tu tienda Shopify y comenzar a automatizar tus ventas con WhatsApp. 
-                ¡En menos de 5 minutos estarás listo para enviar tu primer mensaje automatizado! 🚀
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                Te guiaremos paso a paso para conectar tu tienda Shopify y comenzar a automatizar tus ventas con WhatsApp.
+                En menos de 5 minutos estarás listo para enviar tu primer mensaje automatizado.
               </p>
             </div>
 
@@ -159,7 +158,7 @@ export const EmailVerificationPage = () => {
             <div className="space-y-3 pt-4">
               <Button
                 onClick={handleOpenEmail}
-                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-semibold py-6 text-lg shadow-lg hover:shadow-emerald-500/25 transition-all duration-200"
+                className="w-full font-semibold py-6 text-lg"
               >
                 <ExternalLink className="mr-2 h-5 w-5" />
                 Abrir mi Correo
@@ -169,37 +168,37 @@ export const EmailVerificationPage = () => {
                 onClick={handleResendEmail}
                 disabled={!canResend}
                 variant="outline"
-                className="w-full border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 py-6 text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-6 text-base"
               >
-                <RefreshCw className={`mr-2 h-4 w-4 ${!canResend ? '' : ''}`} />
+                <RefreshCw className="mr-2 h-4 w-4" />
                 {canResend ? 'Reenviar Correo' : `Reenviar en ${countdown}s`}
               </Button>
 
               <Button
                 onClick={() => navigate('/login')}
                 variant="ghost"
-                className="w-full text-gray-400 hover:text-white hover:bg-gray-800 py-6 text-base"
+                className="w-full text-muted-foreground hover:text-foreground py-6 text-base"
               >
                 Ir a Iniciar Sesión
               </Button>
             </div>
 
             {/* Help Section */}
-            <div className="pt-6 border-t border-gray-700">
-              <h4 className="text-gray-300 font-medium text-center mb-3">
+            <div className="pt-6 border-t border-border">
+              <h4 className="text-muted-foreground font-medium text-center mb-3">
                 ¿No recibiste el correo?
               </h4>
-              <div className="space-y-2 text-sm text-gray-400">
+              <div className="space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
                   <span>Revisa tu carpeta de spam o correo no deseado</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-400 flex-shrink-0" />
-                  <span>Verifica que el correo sea correcto: <span className="text-emerald-400">{email}</span></span>
+                  <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
+                  <span>Verifica que el correo sea correcto: <span className="text-primary">{email}</span></span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                  <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
                   <span>Espera unos minutos, a veces puede tardar</span>
                 </div>
               </div>

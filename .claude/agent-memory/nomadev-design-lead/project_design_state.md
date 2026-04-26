@@ -26,18 +26,34 @@ Estado del sistema de diseño tras auditoría completa a 2026-04-25.
 - Inter es fallback; Plus Jakarta Sans es la fuente principal.
 - font-feature-settings activos en html. Correcto.
 
-## Problema crítico #1: Wordmark hardcodeado con inline styles
-- NewDashboardLayout.tsx:637-649: el wordmark NOMADEV.IO usa style={{ fontFamily, textShadow, filter, transform }}
-- Color hardcodeado: text-teal-400 + rgba(45,212,191,...) — fuera del sistema de tokens.
-- skew(-3deg) en transform inline — no hay token para esto.
-- La marca visual usa teal/esmeralda pero el sistema de diseño es azul (217 91% 60%). Fricción de marca.
+## Wordmark (RESUELTO — 2026-04-25)
+- Token --brand-accent: 181 74% 55% añadido en src/index.css (bloque tokens, antes de aliases legacy).
+- Clases .font-orbitron y .wordmark-glow añadidas en @layer components de src/index.css.
+- NewDashboardLayout.tsx:637-641: todos los inline styles eliminados. Usa font-orbitron wordmark-glow.
+- Decisión de marca: teal canonizado como segundo color de identidad Nomadev (diferencia wordmark del azul de acciones).
 
-## Problema crítico #2: Páginas legacy sin migrar al sistema
-- AuthSuccessPage.tsx: usa slate-900, emerald-900, gray-900/90, gray-700, text-white, text-gray-300/400, green-500/600. 100% fuera del sistema de tokens.
-- LoginPage.tsx: usa RippleGrid con gridColor="#10b981" hardcodeado.
-- BrandIdentityPage.tsx: usa from-green-500 to-emerald-500 en botones.
-- ChatPage.tsx: usa from-green-600 to-emerald-600 en botones.
-- 38+ páginas demo/* sin auditar — muchas probablemente también con colores hardcodeados.
+## Migración de páginas al sistema de tokens (2026-04-25)
+### COMPLETADO (Fases B + D):
+- AuthSuccessPage.tsx: migrado a tokens
+- LoginPage.tsx: migrado. RippleGrid gridColor="#10b981" EXCEPCIÓN — canvas WebGL, no acepta CSS vars
+- RegisterPage.tsx: migrado (mismo patrón que LoginPage, incluyendo wordmark-glow)
+- EmailVerificationPage.tsx: migrado
+- BrandIdentityPage.tsx: migrado (3 cambios puntuales)
+- ChatPage.tsx: migrado completamente
+- ProfilePage.tsx: migrado (3 cambios puntuales)
+- SettingsPage.tsx: migrado
+- NotFound.tsx: migrado
+- ShopifyConnectPage.tsx: migrado
+- DropiConnectPage.tsx: migrado
+
+### PENDIENTE (Fase E — requiere luz verde del usuario):
+- 12 páginas demo: ChatDemo, CRMDemo, DemoPage, InteractiveDemo, LeadsDemo, OrdersDemo, ScheduleDemoPage, SettingsDemo, ShopifyDemo, StudioIADemo, TrackingDemo, ValidationDemo
+
+### TAMBIÉN PENDIENTE (no auditadas aún):
+- OrdersPage.tsx, WhatsAppIntegrationPage.tsx, ValidationPage.tsx, WebsiteBuilderPage.tsx, WhatsAppChatPage.tsx, TrackingPage.tsx, ShopifyPage.tsx, SecurityDashboard.tsx, ProductImageGeneratorPage.tsx, PriceOptimizerPage.tsx, OrderValidationPage.tsx, LogoGeneratorPage.tsx, OnboardingPage.tsx, LandingPage.tsx, DropiPage.tsx, CopywritingPage.tsx, CRMPage.tsx, AgentHubPage.tsx, AgentBuilderPage.tsx
+
+### EXCEPCIÓN DOCUMENTADA:
+- RippleGrid gridColor prop (en LoginPage, RegisterPage, EmailVerificationPage): prop string para canvas WebGL, no puede consumir CSS variables. Mantener hardcoded "#10b981".
 
 ## Componentes base (src/components/ui/)
 - Button, Card, Badge, Input, Dialog: todos limpios, usan tokens, bien construidos.
@@ -46,11 +62,11 @@ Estado del sistema de diseño tras auditoría completa a 2026-04-25.
 - custom-cursor.tsx: usa text-emerald-500 hardcodeado. Minor.
 - 56 componentes en total — algunos legacy no auditados (globe.tsx, hero-video-dialog.tsx, orbiting-circles.tsx).
 
-## Problema medio #3: Buscador inline vs CommandPalette duplicado
-- NewDashboardLayout.tsx tiene un Dialog de búsqueda propio (líneas 547-619) con base de datos hardcodeada de 25 items.
-- CommandPalette.tsx es un componente separado con su propia lista de comandos.
-- Son dos sistemas de búsqueda paralelos. Solo uno debería existir (CommandPalette con cmdk-style).
-- El Dialog de búsqueda inline NO está conectado al CommandPalette — ⌘K abre el CommandPalette pero el botón del header abre el Dialog inline.
+## Buscador inline vs CommandPalette (RESUELTO — 2026-04-25)
+- Dialog inline eliminado de NewDashboardLayout.tsx.
+- Botón del header ahora abre CommandPalette vía useCommandPalette hook.
+- ⌘K y botón lupa hacen exactamente lo mismo (ambos setCommandPaletteOpen(true)).
+- handleSearch, searchDatabase de 25 items y estado relacionado eliminados (~100 líneas).
 
 ## Problema medio #4: DashboardLayout thin wrapper
 - DashboardLayout.tsx es un wrapper de 9 líneas que solo re-exporta NewDashboardLayout.
@@ -66,8 +82,15 @@ Estado del sistema de diseño tras auditoría completa a 2026-04-25.
 - Algunos inline styles en Cell de recharts con backgroundColor dinámico — justificado.
 
 ## Estado del roadmap
-- Fase 1: ~90% completa (tokens limpios, line-height correcto, sin !important patológicos, scrollbar sobria).
-- Pendiente Fase 1: self-host fuentes o preload.
-- Fase 2: tokens 2026 definidos. Pendiente: añadir --brand-wordmark token para el teal del logo.
+- Fase 1: COMPLETA. Tokens limpios, line-height correcto, sin !important patológicos, scrollbar sobria.
+- Fase C (self-host fuentes): COMPLETA (2026-04-25).
+  - 16 archivos WOFF2 en public/fonts/ (8 PJS + 7 Inter + 1 Orbitron).
+  - @font-face con weight ranges (400 800 / 400 700 / 400 900) — menos reglas que Google Fonts.
+  - 3 preloads en index.html: latin de PJS + Inter + Orbitron.
+  - Los @import url(fonts.googleapis.com) eliminados.
+  - Nota: index.html aún tiene background-color:#000000 inline en <html>/<body>/<div#root> — deuda Fase 1 restante.
+- Fase 2: tokens 2026 definidos. --brand-accent (teal wordmark) añadido. Pendiente: revisar si HeroUI se queda.
 - Fase 3: componentes base sólidos. Pendiente: decidir HeroUI (está en tailwind.config plugins pero apenas se usa).
-- Fase 4-5: páginas legacy sin migrar (AuthSuccessPage, ChatPage, BrandIdentityPage, 15+ demo pages).
+- Fase A2: consolidación buscadores completada.
+- Fase B+D: 11 páginas activas migradas a tokens.
+- Fase E: CANCELADA — 12 páginas demo son mocks de referencia interna, no producción.

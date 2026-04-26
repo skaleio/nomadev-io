@@ -49,43 +49,43 @@ export default function SettingsPage() {
         <Card className="glass-card p-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
-                <Wifi className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-2 rounded-lg bg-success/10 border border-success/20">
+                <Wifi className="w-5 h-5 text-success" />
               </div>
               Estado del Sistema
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                <Package className="w-6 h-6 text-emerald-600" />
+              <div className="flex items-center gap-3 p-4 bg-success/5 rounded-lg border border-success/20">
+                <Package className="w-6 h-6 text-success" />
                 <div>
-                  <h4 className="font-semibold text-emerald-800 dark:text-emerald-200">
+                  <h4 className="font-semibold text-foreground">
                     Importador Dropi
                   </h4>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  <p className="text-sm text-success">
                     Activo
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                <Activity className="w-6 h-6 text-emerald-600" />
+              <div className="flex items-center gap-3 p-4 bg-success/5 rounded-lg border border-success/20">
+                <Activity className="w-6 h-6 text-success" />
                 <div>
-                  <h4 className="font-semibold text-emerald-800 dark:text-emerald-200">
+                  <h4 className="font-semibold text-foreground">
                     Métricas COD
                   </h4>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  <p className="text-sm text-success">
                     Funcionando
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800">
-                <Database className="w-6 h-6 text-emerald-600" />
+              <div className="flex items-center gap-3 p-4 bg-success/5 rounded-lg border border-success/20">
+                <Database className="w-6 h-6 text-success" />
                 <div>
-                  <h4 className="font-semibold text-emerald-800 dark:text-emerald-200">
+                  <h4 className="font-semibold text-foreground">
                     Base de datos
                   </h4>
-                  <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  <p className="text-sm text-success">
                     Online
                   </p>
                 </div>
@@ -97,8 +97,8 @@ export default function SettingsPage() {
         <Card className="glass-card p-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800">
-                <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                <Users className="w-5 h-5 text-primary" />
               </div>
               Información de la cuenta
             </CardTitle>
@@ -146,7 +146,7 @@ export default function SettingsPage() {
                     Estado
                   </Label>
                   <div className="mt-1">
-                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
+                    <Badge className="bg-success/10 text-success border border-success/20">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Activo
                     </Badge>
@@ -179,8 +179,8 @@ export default function SettingsPage() {
         <Card className="glass-card p-6 border-dashed">
           <CardHeader>
             <CardTitle className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800">
-                <Settings className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <div className="p-2 rounded-lg bg-warning/10 border border-warning/20">
+                <Settings className="w-5 h-5 text-warning" />
               </div>
               Próximamente
             </CardTitle>

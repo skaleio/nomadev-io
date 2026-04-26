@@ -208,8 +208,8 @@ export default function BrandIdentityPage() {
             </Button>
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500">
-                  <Palette className="w-6 h-6 text-white" />
+                <div className="p-2 rounded-lg bg-primary">
+                  <Palette className="w-6 h-6 text-primary-foreground" />
                 </div>
                 Asistente de Identidad de Marca
               </h1>
@@ -218,7 +218,7 @@ export default function BrandIdentityPage() {
               </p>
             </div>
           </div>
-          <Badge className="bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300">
+          <Badge className="bg-warning/10 text-warning border border-warning/20">
             <Sparkles className="w-3 h-3 mr-1" />
             Beta
           </Badge>
@@ -315,10 +315,10 @@ export default function BrandIdentityPage() {
                   />
                 </div>
 
-                <Button 
+                <Button
                   onClick={handleGenerate}
                   disabled={!brandName.trim() || isGenerating}
-                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                  className="w-full"
                 >
                   {isGenerating ? (
                     <>

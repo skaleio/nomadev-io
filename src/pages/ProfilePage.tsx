@@ -222,7 +222,7 @@ export default function ProfilePage() {
                     <div className="absolute -top-2 -right-2 z-10">
                       <label
                         htmlFor="profile-image-upload"
-                        className="bg-gray-600 text-white rounded-full p-1.5 cursor-pointer hover:bg-gray-700 transition-colors shadow-lg"
+                        className="bg-muted text-muted-foreground rounded-full p-1.5 cursor-pointer hover:bg-muted/80 transition-colors shadow-lg"
                         title="Cambiar imagen"
                       >
                         <Settings className="w-3 h-3" />
@@ -236,7 +236,7 @@ export default function ProfilePage() {
                         {profileImage ? (
                           <AvatarImage src={profileImage} alt="Profile" className="border-0 outline-none ring-0" />
                         ) : (
-                          <AvatarFallback className="bg-gray-100 text-gray-600 text-2xl font-bold border-0 outline-none ring-0">
+                          <AvatarFallback className="bg-muted text-muted-foreground text-2xl font-bold border-0 outline-none ring-0">
                             {user?.firstName?.[0] || user?.email?.[0] || 'U'}
                           </AvatarFallback>
                         )}
@@ -260,7 +260,7 @@ export default function ProfilePage() {
                 <p className="text-sm text-muted-foreground mb-3">
                   {user?.email}
                 </p>
-                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                <Badge variant="secondary" className="bg-success/10 text-success border border-success/20">
                   <User className="w-3 h-3 mr-1" />
                   Activo
                 </Badge>

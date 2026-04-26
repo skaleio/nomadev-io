@@ -187,10 +187,10 @@ export default function ChatPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'bg-green-500';
-      case 'away': return 'bg-yellow-500';
-      case 'offline': return 'bg-gray-500';
-      default: return 'bg-gray-500';
+      case 'online': return 'bg-success';
+      case 'away': return 'bg-warning';
+      case 'offline': return 'bg-muted-foreground';
+      default: return 'bg-muted-foreground';
     }
   };
 
@@ -216,8 +216,8 @@ export default function ChatPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Chat en Vivo</h1>
-            <p className="text-gray-400 mt-1">Gestiona las conversaciones con tus clientes</p>
+            <h1 className="text-3xl font-bold text-foreground">Chat en Vivo</h1>
+            <p className="text-muted-foreground mt-1">Gestiona las conversaciones con tus clientes</p>
           </div>
           <div className="flex gap-2">
             <Button 
@@ -234,50 +234,50 @@ export default function ChatPage() {
 
         {/* Métricas */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-gray-900/50 border-gray-700">
+          <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Conversaciones Activas</p>
-                  <p className="text-2xl font-bold text-white">0</p>
+                  <p className="text-muted-foreground text-sm">Conversaciones Activas</p>
+                  <p className="text-2xl font-bold text-foreground">0</p>
                 </div>
-                <MessageCircle className="w-8 h-8 text-blue-400" />
+                <MessageCircle className="w-8 h-8 text-primary" />
               </div>
             </CardContent>
           </Card>
-          
-          <Card className="bg-gray-900/50 border-gray-700">
+
+          <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Clientes En Línea</p>
-                  <p className="text-2xl font-bold text-green-400">0</p>
+                  <p className="text-muted-foreground text-sm">Clientes En Línea</p>
+                  <p className="text-2xl font-bold text-success">0</p>
                 </div>
-                <CheckCircle className="w-8 h-8 text-green-400" />
+                <CheckCircle className="w-8 h-8 text-success" />
               </div>
             </CardContent>
           </Card>
-          
-          <Card className="bg-gray-900/50 border-gray-700">
+
+          <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Mensajes Sin Leer</p>
-                  <p className="text-2xl font-bold text-yellow-400">0</p>
+                  <p className="text-muted-foreground text-sm">Mensajes Sin Leer</p>
+                  <p className="text-2xl font-bold text-warning">0</p>
                 </div>
-                <AlertCircle className="w-8 h-8 text-yellow-400" />
+                <AlertCircle className="w-8 h-8 text-warning" />
               </div>
             </CardContent>
           </Card>
-          
-          <Card className="bg-gray-900/50 border-gray-700">
+
+          <Card className="bg-card border-border">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm">Tiempo Promedio</p>
-                  <p className="text-2xl font-bold text-purple-400">0 min</p>
+                  <p className="text-muted-foreground text-sm">Tiempo Promedio</p>
+                  <p className="text-2xl font-bold text-info">0 min</p>
                 </div>
-                <Clock className="w-8 h-8 text-purple-400" />
+                <Clock className="w-8 h-8 text-info" />
               </div>
             </CardContent>
           </Card>
@@ -285,34 +285,34 @@ export default function ChatPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
           {/* Lista de Contactos */}
-          <Card className="bg-gray-900/50 border-gray-700">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-foreground flex items-center gap-2">
                 <MessageCircle className="w-5 h-5" />
                 Conversaciones ({filteredContacts.length})
               </CardTitle>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="Buscar conversaciones..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-gray-800 border-gray-600 text-white"
+                  className="pl-10"
                 />
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
-                  <span className="ml-2 text-gray-400">Cargando...</span>
+                  <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-muted-foreground">Cargando...</span>
                 </div>
               ) : filteredContacts.length === 0 ? (
                 <div className="text-center py-12">
-                  <MessageCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-white mb-2">No hay conversaciones</h3>
-                  <p className="text-gray-400 mb-4">
-                    {searchTerm 
+                  <MessageCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground mb-2">No hay conversaciones</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm
                       ? 'No se encontraron conversaciones con los filtros aplicados'
                       : 'Conecta tu número de WhatsApp Business para ver las conversaciones aquí'
                     }
@@ -320,7 +320,7 @@ export default function ChatPage() {
                   {!searchTerm && (
                     <Button
                       onClick={handleConnectWhatsApp}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 px-6 shadow-lg hover:shadow-green-500/25 transition-all duration-200 transform hover:scale-105"
+                      className="font-semibold py-3 px-6"
                     >
                       <MessageSquare className="w-5 h-5 mr-2" />
                       Conectar WhatsApp
@@ -336,8 +336,8 @@ export default function ChatPage() {
                         key={contact.id}
                         className={`p-4 cursor-pointer transition-colors ${
                           selectedContact?.id === contact.id
-                            ? 'bg-gray-800 border-l-4 border-blue-500'
-                            : 'hover:bg-gray-800/50'
+                            ? 'bg-muted border-l-4 border-primary'
+                            : 'hover:bg-muted/50'
                         }`}
                         onClick={() => {
                           setSelectedContact(contact);
@@ -346,25 +346,25 @@ export default function ChatPage() {
                       >
                         <div className="flex items-center gap-3">
                           <div className="relative">
-                            <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-gray-400" />
+                            <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-muted-foreground" />
                             </div>
                             <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${getStatusColor(contact.status)}`} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <p className="text-white font-medium truncate">{contact.name}</p>
+                              <p className="text-foreground font-medium truncate">{contact.name}</p>
                               {contact.unread > 0 && (
-                                <Badge className="bg-blue-500 text-white text-xs">
+                                <Badge className="bg-primary text-primary-foreground text-xs">
                                   {contact.unread}
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-gray-400 text-sm truncate">
+                            <p className="text-muted-foreground text-sm truncate">
                               {contact.lastMessage || 'Sin mensajes'}
                             </p>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-gray-500">{getStatusText(contact.status)}</span>
+                              <span className="text-xs text-muted-foreground">{getStatusText(contact.status)}</span>
                             </div>
                           </div>
                         </div>
@@ -378,30 +378,30 @@ export default function ChatPage() {
 
           {/* Área de Chat */}
           <div className="lg:col-span-2">
-            <Card className="bg-gray-900/50 border-gray-700 h-full flex flex-col">
+            <Card className="bg-card border-border h-full flex flex-col">
               {selectedContact ? (
                 <>
-                  <CardHeader className="border-b border-gray-700">
+                  <CardHeader className="border-b border-border">
                     <div className="flex items-center gap-3">
                       <div className="relative">
-                        <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-400" />
+                        <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                          <User className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${getStatusColor(selectedContact.status)}`} />
                       </div>
                       <div>
-                        <h3 className="text-white font-semibold">{selectedContact.name}</h3>
-                        <p className="text-gray-400 text-sm">{getStatusText(selectedContact.status)}</p>
+                        <h3 className="text-foreground font-semibold">{selectedContact.name}</h3>
+                        <p className="text-muted-foreground text-sm">{getStatusText(selectedContact.status)}</p>
                       </div>
                     </div>
                   </CardHeader>
-                  
+
                   <CardContent className="flex-1 flex flex-col p-0">
                     <ScrollArea className="flex-1 p-4">
                       {messages.length === 0 ? (
                         <div className="text-center py-12">
-                          <MessageCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                          <p className="text-gray-400">No hay mensajes en esta conversación</p>
+                          <MessageCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                          <p className="text-muted-foreground">No hay mensajes en esta conversación</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -413,8 +413,8 @@ export default function ChatPage() {
                               <div
                                 className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                                   message.sender === 'agent'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-gray-700 text-white'
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'bg-muted text-foreground'
                                 }`}
                               >
                                 <p className="text-sm">{message.message}</p>
@@ -427,17 +427,17 @@ export default function ChatPage() {
                         </div>
                       )}
                     </ScrollArea>
-                    
-                    <div className="border-t border-gray-700 p-4">
+
+                    <div className="border-t border-border p-4">
                       <div className="flex gap-2">
                         <Input
                           placeholder="Escribe un mensaje..."
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                          className="flex-1 bg-gray-800 border-gray-600 text-white"
+                          className="flex-1"
                         />
-                        <Button 
+                        <Button
                           onClick={handleSendMessage}
                           disabled={!newMessage.trim()}
                         >
@@ -450,9 +450,9 @@ export default function ChatPage() {
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <MessageCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-white mb-2">Selecciona una conversación</h3>
-                    <p className="text-gray-400">Elige una conversación de la lista para comenzar a chatear</p>
+                    <MessageCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Selecciona una conversación</h3>
+                    <p className="text-muted-foreground">Elige una conversación de la lista para comenzar a chatear</p>
                   </div>
                 </div>
               )}

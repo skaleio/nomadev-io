@@ -10,7 +10,16 @@
       "Bash(claude mcp *)",
       "mcp__supabase__list_migrations",
       "mcp__supabase__execute_sql",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(npx tsc *)",
+      "WebFetch(domain:fonts.googleapis.com)",
+      "Bash(wait)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(sort -k2)",
+      "Bash(bun run *)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__list_edge_functions",
+      "mcp__supabase__get_advisors"
     ],
     "deny": [],
     "ask": []
