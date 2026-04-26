@@ -34,9 +34,14 @@ export function useNotifications() {
 
   // Cargar notificaciones cerradas del localStorage
   useEffect(() => {
-    const savedDismissed = localStorage.getItem('dismissedNotifications');
-    if (savedDismissed) {
-      setDismissedNotifications(new Set(JSON.parse(savedDismissed)));
+    try {
+      const savedDismissed = localStorage.getItem('dismissedNotifications');
+      if (savedDismissed) {
+        setDismissedNotifications(new Set(JSON.parse(savedDismissed)));
+      }
+    } catch (e) {
+      // Algunos entornos (iframes, políticas de privacidad) pueden bloquear localStorage
+      console.warn('localStorage no disponible para dismissedNotifications', e);
     }
   }, []);
 
@@ -130,8 +135,12 @@ export function useNotifications() {
     newDismissed.add(id);
     setDismissedNotifications(newDismissed);
     
-    // Guardar en localStorage
-    localStorage.setItem('dismissedNotifications', JSON.stringify([...newDismissed]));
+    // Guardar en localStorage (si está disponible)
+    try {
+      localStorage.setItem('dismissedNotifications', JSON.stringify([...newDismissed]));
+    } catch (e) {
+      console.warn('No se pudo persistir dismissedNotifications', e);
+    }
     
     // Remover de las notificaciones actuales
     setNotifications(prev => prev.filter(notification => notification.id !== id));
@@ -161,8 +170,12 @@ export function useNotifications() {
     const newDismissed = new Set([...dismissedNotifications, ...allIds]);
     setDismissedNotifications(newDismissed);
     
-    // Guardar en localStorage
-    localStorage.setItem('dismissedNotifications', JSON.stringify([...newDismissed]));
+    // Guardar en localStorage (si está disponible)
+    try {
+      localStorage.setItem('dismissedNotifications', JSON.stringify([...newDismissed]));
+    } catch (e) {
+      console.warn('No se pudo persistir dismissedNotifications', e);
+    }
     
     setNotifications([]);
     setIsVisible(false);
@@ -170,7 +183,11 @@ export function useNotifications() {
 
   const clearDismissedHistory = () => {
     setDismissedNotifications(new Set());
-    localStorage.removeItem('dismissedNotifications');
+    try {
+      localStorage.removeItem('dismissedNotifications');
+    } catch (e) {
+      console.warn('No se pudo limpiar dismissedNotifications', e);
+    }
   };
 
   // Calcular estadísticas para modo consolidado

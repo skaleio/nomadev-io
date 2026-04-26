@@ -41,7 +41,12 @@ export const useOnboardingRedirect = () => {
 
         // Si no tiene conexiones activas, redirigir al onboarding
         if (!connections || connections.length === 0) {
-          const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
+          let hasSeenOnboarding: string | null = null;
+          try {
+            hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
+          } catch (e) {
+            console.warn('localStorage no disponible para onboarding_completed', e);
+          }
           
           if (!hasSeenOnboarding) {
             console.log('🎯 Usuario sin tienda conectada, redirigiendo al onboarding...');

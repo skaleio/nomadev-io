@@ -43,7 +43,12 @@ export const useAuthRedirect = () => {
             }
 
             if (shops.length === 0) {
-              const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
+              let hasSeenOnboarding: string | null = null;
+              try {
+                hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
+              } catch (e) {
+                console.warn('localStorage no disponible para onboarding_completed', e);
+              }
               if (!hasSeenOnboarding) {
                 console.log('🎯 Usuario nuevo sin tienda, redirigiendo al onboarding...');
                 navigate('/onboarding', { replace: true });
