@@ -8,7 +8,7 @@ export default {
     "./components/**/*.{ts,tsx}",
     "./app/**/*.{ts,tsx}",
     "./src/**/*.{ts,tsx}",
-    "./node_modules/@heroui/theme/dist/components/form.js"
+    "./node_modules/@heroui/theme/dist/components/*.js"
   ],
   prefix: "",
   theme: {

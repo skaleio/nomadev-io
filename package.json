@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@heroui/form": "^2.1.27",
+    "@heroui/react": "^2.8.10",
     "@heroui/system": "^2.4.23",
     "@heroui/theme": "^2.4.23",
     "@hookform/resolvers": "^3.10.0",

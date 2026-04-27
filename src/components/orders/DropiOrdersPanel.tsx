@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NomaDatePicker } from "@/components/ui/noma-date-picker";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -441,6 +442,12 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       setPostImport(null);
       toast.success(`Importadas ${rowsImported} filas y gasto Meta guardado para ${rangeFrom} → ${rangeTo}`);
       await loadOrders();
+      // Señal para que el Dashboard se re-sincronice sin reload.
+      try {
+        localStorage.setItem("dropi:lastImportAt", String(Date.now()));
+      } catch {
+        // noop (modo privado / storage bloqueado)
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error guardando gasto Meta");
     }
@@ -504,14 +511,18 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4 items-end">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Desde (FECHA pedido)</label>
-            <Input type="date" value={dateFrom} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} className="w-40" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Hasta</label>
-            <Input type="date" value={dateTo} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} className="w-40" />
-          </div>
+          <NomaDatePicker
+            label="Desde (FECHA pedido)"
+            value={dateFrom}
+            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
+            maxValue={dateTo || undefined}
+          />
+          <NomaDatePicker
+            label="Hasta"
+            value={dateTo}
+            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
+            minValue={dateFrom || undefined}
+          />
           <p className="text-xs text-muted-foreground max-w-md pb-1">
             Región, producto y logística se ajustan desde <span className="font-medium text-foreground/90">Filtros</span> en la lista de pedidos.
           </p>
@@ -578,7 +589,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        <MetricCard title="Total pedidos" value={String(metrics.totalPedidos)} icon={Package} loading={loading} />
+        <MetricCard title="Total pedidos" value="100%" icon={Package} description={`${metrics.totalPedidos} pedidos`} loading={loading} />
         <MetricCard title="Confirmados *" value={`${c.confirmados} (${pct(c.confirmados)})`} icon={BarChart3} color="info" description="En tránsito / reparto" loading={loading} />
         <MetricCard title="Entregados" value={`${c.entregados} (${pct(c.entregados)})`} icon={TrendingUp} color="success" loading={loading} />
         <MetricCard title="Pendientes" value={`${c.pendientes} (${pct(c.pendientes)})`} icon={Target} loading={loading} />
@@ -1377,14 +1388,20 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                 · <span className="font-medium text-foreground">{postImport.rowsImported} filas</span> importadas.
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Fecha de inicio</label>
-                  <Input type="date" value={postImport.rangeFrom} onChange={(e) => setPostImport((p) => (p ? { ...p, rangeFrom: e.target.value } : p))} />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground block mb-1.5">Fecha de término</label>
-                  <Input type="date" value={postImport.rangeTo} onChange={(e) => setPostImport((p) => (p ? { ...p, rangeTo: e.target.value } : p))} />
-                </div>
+                <NomaDatePicker
+                  label="Fecha de inicio"
+                  value={postImport.rangeFrom}
+                  onChange={(v) => setPostImport((p) => (p ? { ...p, rangeFrom: v } : p))}
+                  maxValue={postImport.rangeTo || undefined}
+                  className="w-full"
+                />
+                <NomaDatePicker
+                  label="Fecha de término"
+                  value={postImport.rangeTo}
+                  onChange={(v) => setPostImport((p) => (p ? { ...p, rangeTo: v } : p))}
+                  minValue={postImport.rangeFrom || undefined}
+                  className="w-full"
+                />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground block mb-1.5">

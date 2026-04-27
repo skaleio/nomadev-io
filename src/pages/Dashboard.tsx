@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [dropiOrders, setDropiOrders] = useState<DropiOrderRow[]>([]);
   const [metaSpend, setMetaSpend] = useState(0);
   const [loadingDropi, setLoadingDropi] = useState(false);
+  const lastSyncRef = useRef<number>(0);
 
   const range = useMemo(() => {
     const to = new Date();
@@ -61,11 +62,10 @@ export default function Dashboard() {
     return { from: isoLocal(from), to: isoLocal(to) };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const syncDropi = useCallback(async () => {
     if (!user?.id) return;
     setLoadingDropi(true);
-    (async () => {
+    try {
       const [{ data: orders }, { data: meta }] = await Promise.all([
         supabase
           .from('dropi_orders')
@@ -82,16 +82,41 @@ export default function Dashboard() {
           .eq('period_end', range.to)
           .maybeSingle(),
       ]);
-      if (cancelled) return;
       setDropiOrders((orders ?? []) as DropiOrderRow[]);
       const metaRow = (meta ?? null) as { meta_ad_spend: number | null } | null;
       setMetaSpend(metaRow?.meta_ad_spend ?? 0);
+      lastSyncRef.current = Date.now();
+    } finally {
       setLoadingDropi(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    }
   }, [user?.id, range.from, range.to]);
+
+  useEffect(() => {
+    void syncDropi();
+  }, [syncDropi]);
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'dropi:lastImportAt') return;
+      void syncDropi();
+    };
+    const maybeResync = () => {
+      // Evita spam de requests al alternar tabs rápidamente.
+      if (Date.now() - lastSyncRef.current < 1500) return;
+      void syncDropi();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') maybeResync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', maybeResync);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', maybeResync);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [syncDropi]);
 
   const metrics = useMemo(() => {
     return computeDropiMetrics(dropiOrders as DropiOrderForMetrics[], metaSpend);
