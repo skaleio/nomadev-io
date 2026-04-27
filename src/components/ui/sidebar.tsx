@@ -116,7 +116,11 @@ const SidebarProvider = React.forwardRef<
               ...style,
             } as React.CSSProperties
           }
-          className={cn("group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar", className)}
+          className={cn(
+            // `w-screen` + `min-w-0` evita zonas negras en fullscreen (F11) por shrink-to-fit raro en algunos layouts.
+            "group/sidebar-wrapper flex min-h-svh w-screen min-w-0 overflow-x-hidden has-[[data-variant=inset]]:bg-sidebar",
+            className,
+          )}
           ref={ref}
           {...props}
         >
@@ -274,7 +278,8 @@ const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<"main
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col overflow-hidden bg-background font-sans antialiased",
+        // `min-w-0` evita que el inset se achique por contenido (bug típico en flex layouts en pantallas anchas/F11).
+        "relative flex min-h-svh w-full min-w-0 flex-1 flex-col overflow-hidden bg-background font-sans antialiased",
         "peer-data-[variant=inset]:app-canvas peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-2xl md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-border/50 md:peer-data-[variant=inset]:shadow-elev-3 md:peer-data-[variant=inset]:ring-1 md:peer-data-[variant=inset]:ring-white/[0.03]",
         className,
       )}

@@ -541,7 +541,7 @@ export function NewDashboardLayout({ children }: NewDashboardLayoutProps) {
           </div>
         </header>
         
-        <div className="custom-scrollbar flex flex-1 flex-col gap-6 overflow-y-auto p-6 lg:p-8">
+        <div className="custom-scrollbar flex w-full min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-6 lg:p-8">
           {children}
         </div>
       </SidebarInset>

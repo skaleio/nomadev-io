@@ -235,6 +235,16 @@
   z-index: 9999 !important;
 }
 
+/* Cursor custom global: por encima de overlays HeroUI (9999 + !important) y del dashboard */
+[data-nomadev-cursor-layer] {
+  position: fixed !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+  z-index: 2147483647 !important;
+  isolation: isolate !important;
+}
+
 @layer components {
   /**
    * Lienzo principal del SaaS — profundidad sin ruido visual.

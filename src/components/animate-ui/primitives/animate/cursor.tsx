@@ -210,7 +210,8 @@ function Cursor({ ref, asChild = false, style, ...props }: CursorProps) {
           style={{
             transform: 'translate(-50%,-50%)',
             pointerEvents: 'none',
-            zIndex: 9999,
+            // Dentro de [data-nomadev-cursor-layer] el stacking lo resuelve la capa (z-index máximo en CSS).
+            zIndex: global ? 1 : 100_000,
             position: global ? 'fixed' : 'absolute',
             top: y,
             left: x,
@@ -229,7 +230,12 @@ function Cursor({ ref, asChild = false, style, ...props }: CursorProps) {
   // dentro de #root (que puede ser un stacking context), puede quedar "por detrás".
   // Portaleamos el cursor global a body para asegurar que quede arriba.
   if (global && typeof document !== 'undefined') {
-    return createPortal(node, document.body);
+    return createPortal(
+      <div data-nomadev-cursor-layer aria-hidden className="nomadev-cursor-layer">
+        {node}
+      </div>,
+      document.body,
+    );
   }
 
   return node;
@@ -369,7 +375,7 @@ function CursorFollow({
           style={{
             transform: 'translate(-50%,-50%)',
             pointerEvents: 'none',
-            zIndex: 9998,
+            zIndex: global ? 0 : 99_999,
             position: global ? 'fixed' : 'absolute',
             top: springY,
             left: springX,
