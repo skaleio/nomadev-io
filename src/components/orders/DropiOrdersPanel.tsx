@@ -147,12 +147,16 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const filters: DropiMetricsFilters = useMemo(() => ({ region, product, carrier }), [region, product, carrier]);
 
   const chartBounds = useMemo(() => {
-    const today = new Date();
-    const chartTo = isoLocal(today);
-    const start = new Date(today);
+    // El gráfico debe respetar el rango elegido por el usuario.
+    // Usamos `dateTo` como fin y recortamos hacia atrás según `chartPeriodDays`,
+    // sin salirnos de `dateFrom`.
+    const to = dateTo ? new Date(dateTo + "T12:00:00") : new Date();
+    const chartTo = isoLocal(to);
+    const start = new Date(to);
     start.setDate(start.getDate() - (chartPeriodDays - 1));
-    return { chartFrom: isoLocal(start), chartTo };
-  }, [chartPeriodDays]);
+    const chartFrom = maxIso(isoLocal(start), dateFrom);
+    return { chartFrom, chartTo };
+  }, [chartPeriodDays, dateFrom, dateTo]);
 
   const fetchBounds = useMemo(() => ({
     from: minIso(dateFrom, chartBounds.chartFrom),

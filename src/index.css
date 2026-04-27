@@ -223,12 +223,6 @@
    Components layer — utilidades reutilizables
    ========================================================================= */
 
-/* HeroUI DatePicker — overlay fuera del stacking context de #root */
-[data-overlay-container] {
-  position: fixed;
-  z-index: 9999;
-}
-
 /* Forzar que el popover de HeroUI sea visible por encima de todo */
 .heroui-date-picker-popover,
 [role="dialog"][data-placement] {
