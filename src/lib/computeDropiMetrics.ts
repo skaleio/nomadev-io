@@ -76,6 +76,11 @@ function variableCost(o: DropiOrderForMetrics): number {
   );
 }
 
+/** Margen por pedido antes de comisiones/devoluciones/Meta: precio venta − flete − costo proveedor (campos del Excel). */
+function contributionSaleMinusShippingAndProduct(o: DropiOrderForMetrics): number {
+  return saleAmount(o) - (o.shipping_price ?? 0) - (o.supplier_total ?? 0);
+}
+
 export function filterDropiOrders<T extends DropiOrderForMetrics>(orders: T[], f: DropiMetricsFilters): T[] {
   return orders.filter(
     (o) => matchesRegion(o, f.region) && matchesProduct(o, f.product) && matchesCarrier(o, f.carrier),
@@ -250,10 +255,11 @@ function buildProductInsight(label: string, slice: DropiOrderForMetrics[], metaS
   const precioPromedio =
     nonCanc.length > 0 ? nonCanc.reduce((s, o) => s + saleAmount(o), 0) / nonCanc.length : 0;
 
-  const avgVar =
-    delivered.length > 0 ? delivered.reduce((s, o) => s + variableCost(o), 0) / delivered.length : 0;
   const adPerDel = delivered.length > 0 ? metaSlice / delivered.length : 0;
-  const breakevenPorPedido = delivered.length > 0 ? avgVar + adPerDel : null;
+  const breakevenPorPedido =
+    delivered.length > 0
+      ? delivered.reduce((s, o) => s + contributionSaleMinusShippingAndProduct(o), 0) / delivered.length
+      : null;
 
   const avgProfitDel =
     delivered.length > 0 ? delivered.reduce((s, o) => s + profitAmount(o), 0) / delivered.length : 0;
@@ -327,7 +333,7 @@ export function computeAllProductInsights(
 
 /**
  * KPIs del producto #1: precio medio, tasas por estado, y unidades económicas por pedido entregado.
- * Breakeven/pedido = coste variable medio (proveedor+flete+comisiones) + reparto proporcional de Meta / entregados.
+ * Breakeven/pedido = promedio en entregados de (valor venta − flete − costo proveedor), según columnas del Excel.
  * Profit neto/pedido = ganancia bruta media entregado − reparto Meta por entregado.
  * Precio sugerido = breakeven × 1,30 (margen orientativo).
  */

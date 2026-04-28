@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { parseDropiXlsxArrayBuffer, toSupabaseInsertRows } from "@/lib/dropiImport";
+import { readDropiSessionPrefs, writeDropiSessionPrefs, type DropiPanelSessionPrefsV1 } from "@/lib/dropiSessionPrefs";
 import {
   aggregateOrdersByRegion,
   attributedMetaSpend,
@@ -44,6 +45,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Command,
   CommandEmpty,
@@ -134,6 +136,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [productFilterOpen, setProductFilterOpen] = useState(false);
   const [carrierFilterOpen, setCarrierFilterOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
+  /** Oculta el bloque de importación (persiste en sessionStorage hasta cerrar sesión / pestaña). */
+  const [importCardCollapsed, setImportCardCollapsed] = useState(false);
+  /** Evita escribir prefs por defecto antes de leer la sesión guardada. */
+  const [sessionHydrated, setSessionHydrated] = useState(false);
   const [postImport, setPostImport] = useState<{
     open: boolean;
     detectedFrom: string;
@@ -196,11 +202,62 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       .maybeSingle();
     if (error) { console.warn(error); return; }
     const spend = data?.meta_ad_spend;
-    setMetaInput(spend != null ? String(spend) : "");
+    if (spend != null) {
+      setMetaInput(String(spend));
+      return;
+    }
+    const prefs = readDropiSessionPrefs(userId);
+    if (prefs && prefs.dateFrom === dateFrom && prefs.dateTo === dateTo && prefs.metaInput.trim() !== "") {
+      setMetaInput(prefs.metaInput);
+    } else {
+      setMetaInput("");
+    }
   }, [userId, dateFrom, dateTo]);
 
-  useEffect(() => { void loadOrders(); }, [loadOrders]);
-  useEffect(() => { void loadMetaSnapshot(); }, [loadMetaSnapshot]);
+  useEffect(() => {
+    if (!userId) {
+      setSessionHydrated(false);
+      return;
+    }
+    const saved = readDropiSessionPrefs(userId);
+    if (saved) {
+      setRange({ from: saved.dateFrom, to: saved.dateTo });
+      setRegion(typeof saved.region === "string" ? saved.region : "all");
+      setProduct(typeof saved.product === "string" ? saved.product : "all");
+      setCarrier(typeof saved.carrier === "string" ? saved.carrier : "all");
+      const cp = saved.chartPeriodDays;
+      setChartPeriodDays(cp === 1 || cp === 7 || cp === 14 || cp === 30 ? cp : 30);
+      setImportCardCollapsed(!!saved.importCardCollapsed);
+      if (typeof saved.metaInput === "string") setMetaInput(saved.metaInput);
+    }
+    setSessionHydrated(true);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !sessionHydrated) return;
+    void loadOrders();
+  }, [userId, sessionHydrated, loadOrders]);
+
+  useEffect(() => {
+    if (!userId || !sessionHydrated) return;
+    void loadMetaSnapshot();
+  }, [userId, sessionHydrated, loadMetaSnapshot]);
+
+  useEffect(() => {
+    if (!userId || !sessionHydrated) return;
+    const prefs: DropiPanelSessionPrefsV1 = {
+      v: 1,
+      dateFrom,
+      dateTo,
+      region,
+      product,
+      carrier,
+      metaInput,
+      chartPeriodDays,
+      importCardCollapsed,
+    };
+    writeDropiSessionPrefs(userId, prefs);
+  }, [userId, sessionHydrated, dateFrom, dateTo, region, product, carrier, metaInput, chartPeriodDays, importCardCollapsed]);
 
   const ordersInMainRange = useMemo(
     () => orders.filter((o) => o.order_date >= dateFrom && o.order_date <= dateTo),
@@ -444,6 +501,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       setRange({ from: rangeFrom, to: rangeTo });
       setMetaInput(String(metaValue));
       setPostImport(null);
+      setImportCardCollapsed(true);
       toast.success(`Importadas ${rowsImported} filas y gasto Meta guardado para ${rangeFrom} → ${rangeTo}`);
       await loadOrders();
       // Señal para que el Dashboard se re-sincronice sin reload.
@@ -508,43 +566,63 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       )}
       {/* ── Importar ── */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-3">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Upload className="size-4" strokeWidth={2} />
             Importar guías de pedidos
           </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-4 items-end">
-          <NomaDatePicker
-            label="Desde (FECHA pedido)"
-            value={dateFrom}
-            onChange={(v) => setRange((r) => ({ ...r, from: v }))}
-            maxValue={dateTo || undefined}
-          />
-          <NomaDatePicker
-            label="Hasta"
-            value={dateTo}
-            onChange={(v) => setRange((r) => ({ ...r, to: v }))}
-            minValue={dateFrom || undefined}
-          />
-          <p className="text-xs text-muted-foreground max-w-md pb-1">
-            Región, producto y logística se ajustan desde <span className="font-medium text-foreground/90">Filtros</span> en la lista de pedidos.
-          </p>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground block mb-1.5">Archivo</label>
-            <Input
-              type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              onChange={(e) => void onFile(e)}
-              disabled={importing}
-              className="max-w-xs"
-            />
-          </div>
-          <Button variant="outline" size="sm" onClick={() => void loadOrders()} disabled={loading}>
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
-            Recargar
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0 gap-1.5"
+            onClick={() => setImportCardCollapsed((c) => !c)}
+          >
+            {importCardCollapsed ? "Mostrar importación" : "Ocultar"}
+            <ChevronDown className={`size-4 transition-transform ${importCardCollapsed ? "" : "rotate-180"}`} />
           </Button>
-        </CardContent>
+        </CardHeader>
+        {importCardCollapsed ? (
+          <CardContent className="pt-0">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Rango activo <span className="font-medium text-foreground/90 tabular-nums">{dateFrom}</span> →{" "}
+              <span className="font-medium text-foreground/90 tabular-nums">{dateTo}</span>. Tus pedidos y filtros se
+              mantienen al cambiar de página mientras la sesión del navegador siga abierta.
+            </p>
+          </CardContent>
+        ) : (
+          <CardContent className="flex flex-wrap gap-4 items-end">
+            <NomaDatePicker
+              label="Desde (FECHA pedido)"
+              value={dateFrom}
+              onChange={(v) => setRange((r) => ({ ...r, from: v }))}
+              maxValue={dateTo || undefined}
+            />
+            <NomaDatePicker
+              label="Hasta"
+              value={dateTo}
+              onChange={(v) => setRange((r) => ({ ...r, to: v }))}
+              minValue={dateFrom || undefined}
+            />
+            <p className="text-xs text-muted-foreground max-w-md pb-1">
+              Región, producto y logística se ajustan desde <span className="font-medium text-foreground/90">Filtros</span> en la lista de pedidos.
+            </p>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-1.5">Archivo</label>
+              <Input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => void onFile(e)}
+                disabled={importing}
+                className="max-w-xs"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void loadOrders()} disabled={loading}>
+              <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+              Recargar
+            </Button>
+          </CardContent>
+        )}
       </Card>
 
       {/* ── Meta spend ── */}
@@ -582,6 +660,31 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         <MetricCard title="Ganancia real" value={formatMoney(metrics.gananciaReal)} icon={TrendingUp} color="success" description="Suma GANANCIA solo pedidos entregados" loading={loading} />
         <MetricCard title="Ganancia estimada" value={formatMoney(metrics.gananciaEstimada)} icon={TrendingUp} color="warning" description="Suma GANANCIA en todos los no cancelados" loading={loading} />
         <MetricCard title="Ganancia promedio" value={formatMoney(metrics.gananciaPromedioEntregado)} icon={Target} color="primary" description="Por pedido entregado" loading={loading} />
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/95 p-5 shadow-elev-1 backdrop-blur-sm transition-all duration-base ease-standard hover:border-border/80 hover:shadow-elev-2 hover:-translate-y-px">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
+              <Package className="size-[18px]" strokeWidth={2} />
+            </div>
+          </div>
+          <div className="mt-5 space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vista por producto</p>
+            <Select value={product} onValueChange={setProduct} disabled={loading || productFilterOptions.length <= 1}>
+              <SelectTrigger className="h-10 w-full border-border/60 bg-background/80 text-left text-foreground">
+                <SelectValue placeholder="Todos los productos" />
+              </SelectTrigger>
+              <SelectContent position="popper" className="max-h-[min(60vh,320px)]">
+                {productFilterOptions.map((opt) => (
+                  <SelectItem key={opt.value === "all" ? "__all__" : opt.label} value={opt.value}>
+                    {opt.value === "all" ? opt.label : `${opt.label} (${opt.count})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Categorías leídas del Excel (columna CATEGORÍAS). Respeta región y logística si las tienes filtradas.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -922,7 +1025,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                             title="Breakeven / pedido"
                             value={ins.breakevenPorPedido != null ? formatMoney(ins.breakevenPorPedido) : "—"}
                             icon={Scale}
-                            description="Coste variable medio entregado + Meta atribuida / entregado"
+                            description="Prom. entregados: precio venta − flete − costo proveedor (Excel)"
                             loading={loading}
                           />
                           <MetricCard

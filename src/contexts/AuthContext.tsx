@@ -1,5 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '../integrations/supabase/client';
+import {
+  clearDropiSessionPrefs,
+  clearExpectFreshDropiLoginMarker,
+  consumeExpectFreshDropiLogin,
+  markExpectFreshDropiLogin,
+} from '@/lib/dropiSessionPrefs';
+import { resetDropiImportedDataForUser } from '@/lib/resetDropiImportedData';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import type { Tables } from '../integrations/supabase/types';
 
@@ -98,6 +105,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (!isMounted) return;
 
         if (event === 'SIGNED_IN' && session?.user) {
+          const uid = session.user.id;
+          const freshLogin = consumeExpectFreshDropiLogin();
+          if (freshLogin) {
+            clearDropiSessionPrefs(uid);
+            try {
+              localStorage.removeItem('dropi:lastImportAt');
+            } catch {
+              /* noop */
+            }
+            await resetDropiImportedDataForUser(uid);
+          }
           // Setear usuario inmediatamente para desbloquear la UI
           setUser(buildQuickUser(session.user));
           setIsLoading(false);
@@ -217,6 +235,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const testEmail = import.meta.env.VITE_TEST_LOGIN_EMAIL;
     const testPassword = import.meta.env.VITE_TEST_LOGIN_PASSWORD;
     if (allowTestLogin && testEmail && testPassword && email === testEmail && password === testPassword) {
+      clearDropiSessionPrefs('test-user-12345');
+      try {
+        localStorage.removeItem('dropi:lastImportAt');
+      } catch {
+        /* noop */
+      }
+      clearExpectFreshDropiLoginMarker();
       setUser({
         id: 'test-user-12345',
         email: testEmail,
@@ -245,6 +270,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), LOGIN_TIMEOUT_MS);
     });
+
+    markExpectFreshDropiLogin();
 
     let authError: Error | null = null;
     const authPromise = supabase.auth.signInWithPassword({ email, password }).then(
@@ -287,6 +314,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         errorMessage = msg;
       }
       setError(errorMessage);
+      clearExpectFreshDropiLoginMarker();
       throw err;
     } finally {
       signedInSub?.unsubscribe();
@@ -296,6 +324,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const loginWithGoogle = async () => {
     try {
       setError(null);
+      markExpectFreshDropiLogin();
       const redirectTo = `${window.location.origin}/dashboard`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -303,11 +332,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
       if (error) {
         setError(error.message);
+        clearExpectFreshDropiLoginMarker();
         throw error;
       }
       // La redirección a Google la hace Supabase; al volver, onAuthStateChange actualizará el usuario
     } catch (error: any) {
       console.error('Error login con Google:', error);
+      clearExpectFreshDropiLoginMarker();
       setError(error?.message || 'Error al iniciar sesión con Google');
       throw error;
     }
@@ -376,11 +407,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
+    const sessionUserId = user?.id;
     try {
       await supabase.auth.signOut();
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     } finally {
+      if (sessionUserId) clearDropiSessionPrefs(sessionUserId);
+      try {
+        localStorage.removeItem('dropi:lastImportAt');
+      } catch {
+        /* noop */
+      }
       setUser(null);
       // Redirigir a la landing page después del logout
       window.location.href = '/';
