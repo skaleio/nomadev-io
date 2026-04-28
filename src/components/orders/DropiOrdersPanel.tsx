@@ -14,6 +14,7 @@ import { parseDropiXlsxArrayBuffer, toSupabaseInsertRows } from "@/lib/dropiImpo
 import { readDropiSessionPrefs, writeDropiSessionPrefs, type DropiPanelSessionPrefsV1 } from "@/lib/dropiSessionPrefs";
 import {
   aggregateOrdersByRegion,
+  aggregateDeliveryDaysByRegion,
   attributedMetaSpend,
   carrierKey,
   computeDailyProfitTrend,
@@ -124,6 +125,9 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [region, setRegion] = useState("all");
   const [product, setProduct] = useState("all");
   const [carrier, setCarrier] = useState("all");
+  const [statusBucket, setStatusBucket] = useState<
+    "all" | "in_transit" | "delivered" | "pending" | "issue" | "return_flow" | "cancelled"
+  >("all");
   const [metaInput, setMetaInput] = useState("");
   const [orders, setOrders] = useState<DropiOrderRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -131,11 +135,15 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [importStage, setImportStage] = useState<string | null>(null);
   const [chartPeriodDays, setChartPeriodDays] = useState<1 | 7 | 14 | 30>(30);
   const [vizRegion, setVizRegion] = useState<string | null>(null);
+  const [regionChartBucket, setRegionChartBucket] = useState<
+    "all" | "delivered" | "return_flow" | "cancelled" | "in_transit"
+  >("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [regionFilterOpen, setRegionFilterOpen] = useState(false);
   const [productFilterOpen, setProductFilterOpen] = useState(false);
   const [carrierFilterOpen, setCarrierFilterOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
+  const listRef = React.useRef<HTMLDivElement | null>(null);
   /** Oculta el bloque de importación (persiste en sessionStorage hasta cerrar sesión / pestaña). */
   const [importCardCollapsed, setImportCardCollapsed] = useState(false);
   /** Evita escribir prefs por defecto antes de leer la sesión guardada. */
@@ -331,8 +339,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
   const ordersListFiltered = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
-    if (!q) return filteredForMetrics;
-    return filteredForMetrics.filter((o) => {
+    const statusFiltered =
+      statusBucket === "all" ? filteredForMetrics : filteredForMetrics.filter((o) => o.status_bucket === statusBucket);
+    if (!q) return statusFiltered;
+    return statusFiltered.filter((o) => {
       const blob = [
         o.customer_name,
         o.customer_phone,
@@ -350,19 +360,50 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         .toLowerCase();
       return blob.includes(q);
     });
-  }, [filteredForMetrics, clientQuery]);
+  }, [filteredForMetrics, clientQuery, statusBucket]);
 
   const ordersChartProductOnly = useMemo(
     () => filterDropiOrders(ordersForChartWindow, { region: "all", product, carrier }),
     [ordersForChartWindow, product, carrier],
   );
 
+  const regionChartOrders = useMemo(() => {
+    if (regionChartBucket === "all") return ordersChartProductOnly;
+    return ordersChartProductOnly.filter((o) => o.status_bucket === regionChartBucket);
+  }, [ordersChartProductOnly, regionChartBucket]);
+
   const profitTrend = useMemo(
     () => computeDailyProfitTrend(ordersChartProductOnly, chartBounds.chartFrom, chartBounds.chartTo),
     [ordersChartProductOnly, chartBounds.chartFrom, chartBounds.chartTo],
   );
 
-  const regionBars = useMemo(() => aggregateOrdersByRegion(ordersChartProductOnly), [ordersChartProductOnly]);
+  const regionBars = useMemo(() => aggregateOrdersByRegion(regionChartOrders), [regionChartOrders]);
+
+  const deliveryDaysByRegion = useMemo(
+    () => aggregateDeliveryDaysByRegion(ordersChartProductOnly),
+    [ordersChartProductOnly],
+  );
+
+  const regionBucketCounts = useMemo(() => {
+    const base = ordersChartProductOnly;
+    return {
+      all: base.length,
+      delivered: base.filter((o) => o.status_bucket === "delivered").length,
+      return_flow: base.filter((o) => o.status_bucket === "return_flow").length,
+      cancelled: base.filter((o) => o.status_bucket === "cancelled").length,
+      in_transit: base.filter((o) => o.status_bucket === "in_transit").length,
+    };
+  }, [ordersChartProductOnly]);
+
+  const regionChartTitle = useMemo(() => {
+    switch (regionChartBucket) {
+      case "delivered": return "Entregados por región";
+      case "return_flow": return "Devoluciones por región";
+      case "cancelled": return "Cancelados por región";
+      case "in_transit": return "En tránsito por región";
+      default: return "Pedidos por región";
+    }
+  }, [regionChartBucket]);
 
   const metaSpend = useMemo(() => {
     const n = Number(String(metaInput).replace(/\s/g, "").replace(",", "."));
@@ -526,6 +567,12 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const total = metrics.totalPedidos;
   const c = metrics.counts;
   const pct = (n: number) => (total > 0 ? `${Math.round((n / total) * 100)}%` : "0%");
+  const shippingTotal = useMemo(() => {
+    // Coste de envíos "general": suma PRECIO FLETE de pedidos no cancelados del slice actual.
+    return filteredForMetrics
+      .filter((o) => o.status_bucket !== "cancelled")
+      .reduce((s, o) => s + (o.shipping_price ?? 0), 0);
+  }, [filteredForMetrics]);
 
   /* ── chart theme ── */
   const chartTheme = {
@@ -541,7 +588,21 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   };
 
   const dimensionFilterActive =
-    (region !== "all" ? 1 : 0) + (product !== "all" ? 1 : 0) + (carrier !== "all" ? 1 : 0);
+    (region !== "all" ? 1 : 0) + (product !== "all" ? 1 : 0) + (carrier !== "all" ? 1 : 0) + (statusBucket !== "all" ? 1 : 0);
+
+  const statusLabel = useMemo(() => {
+    if (statusBucket === "all") return null;
+    const label = BUCKET_LABEL[statusBucket];
+    return label ?? statusBucket;
+  }, [statusBucket]);
+
+  const applyStatusFilter = (bucket: typeof statusBucket) => {
+    setStatusBucket((prev) => (prev === bucket ? "all" : bucket));
+    // Llevar al usuario a la lista para ver las guías/pedidos correspondientes.
+    requestAnimationFrame(() => {
+      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -697,12 +758,101 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <MetricCard title="Total pedidos" value="100%" icon={Package} description={`${metrics.totalPedidos} pedidos`} loading={loading} />
-        <MetricCard title="Confirmados *" value={`${c.confirmados} (${pct(c.confirmados)})`} icon={BarChart3} color="info" description="En tránsito / reparto" loading={loading} />
-        <MetricCard title="Entregados" value={`${c.entregados} (${pct(c.entregados)})`} icon={TrendingUp} color="success" loading={loading} />
-        <MetricCard title="Pendientes" value={`${c.pendientes} (${pct(c.pendientes)})`} icon={Target} loading={loading} />
-        <MetricCard title="Novedades" value={`${c.novedades} (${pct(c.novedades)})`} icon={BarChart3} color="warning" loading={loading} />
-        <MetricCard title="En devolución" value={`${c.enDevolucion} (${pct(c.enDevolucion)})`} icon={Package} color="destructive" loading={loading} />
-        <MetricCard title="Cancelados" value={`${c.cancelados} (${pct(c.cancelados)})`} icon={Package} color="destructive" loading={loading} />
+        <button
+          type="button"
+          onClick={() => applyStatusFilter("in_transit")}
+          className="text-left"
+          aria-pressed={statusBucket === "in_transit"}
+          title="Filtrar lista: Confirmados"
+        >
+          <MetricCard
+            title="Confirmados *"
+            value={`${c.confirmados} (${pct(c.confirmados)})`}
+            icon={BarChart3}
+            color="info"
+            description={statusBucket === "in_transit" ? "Filtrando lista" : "En tránsito / reparto"}
+            loading={loading}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyStatusFilter("delivered")}
+          className="text-left"
+          aria-pressed={statusBucket === "delivered"}
+          title="Filtrar lista: Entregados"
+        >
+          <MetricCard
+            title="Entregados"
+            value={`${c.entregados} (${pct(c.entregados)})`}
+            icon={TrendingUp}
+            color="success"
+            description={statusBucket === "delivered" ? "Filtrando lista" : undefined}
+            loading={loading}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyStatusFilter("pending")}
+          className="text-left"
+          aria-pressed={statusBucket === "pending"}
+          title="Filtrar lista: Pendientes"
+        >
+          <MetricCard
+            title="Pendientes"
+            value={`${c.pendientes} (${pct(c.pendientes)})`}
+            icon={Target}
+            description={statusBucket === "pending" ? "Filtrando lista" : undefined}
+            loading={loading}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyStatusFilter("issue")}
+          className="text-left"
+          aria-pressed={statusBucket === "issue"}
+          title="Filtrar lista: Novedades"
+        >
+          <MetricCard
+            title="Novedades"
+            value={`${c.novedades} (${pct(c.novedades)})`}
+            icon={BarChart3}
+            color="warning"
+            description={statusBucket === "issue" ? "Filtrando lista" : undefined}
+            loading={loading}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyStatusFilter("return_flow")}
+          className="text-left"
+          aria-pressed={statusBucket === "return_flow"}
+          title="Filtrar lista: En devolución"
+        >
+          <MetricCard
+            title="En devolución"
+            value={`${c.enDevolucion} (${pct(c.enDevolucion)})`}
+            icon={Package}
+            color="destructive"
+            description={statusBucket === "return_flow" ? "Filtrando lista" : undefined}
+            loading={loading}
+          />
+        </button>
+        <button
+          type="button"
+          onClick={() => applyStatusFilter("cancelled")}
+          className="text-left"
+          aria-pressed={statusBucket === "cancelled"}
+          title="Filtrar lista: Cancelados"
+        >
+          <MetricCard
+            title="Cancelados"
+            value={`${c.cancelados} (${pct(c.cancelados)})`}
+            icon={Package}
+            color="destructive"
+            description={statusBucket === "cancelled" ? "Filtrando lista" : undefined}
+            loading={loading}
+          />
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -768,7 +918,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       {/* ── Pedidos por región ── */}
       <Card>
         <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle>Pedidos por región</CardTitle>
+          <CardTitle>{regionChartTitle}</CardTitle>
           {vizRegion && (
             <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setVizRegion(null)}>
               Quitar selección
@@ -819,6 +969,40 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
             Clic en una barra para ver KPIs de esa región. El gasto en anuncios se reparte proporcionalmente al volumen de pedidos.
           </p>
 
+          {/* ── Filtro por estado (para el gráfico) ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {(
+              [
+                { key: "all", label: "Todos", count: regionBucketCounts.all },
+                { key: "delivered", label: "Entregados", count: regionBucketCounts.delivered },
+                { key: "return_flow", label: "Devoluciones", count: regionBucketCounts.return_flow },
+                { key: "in_transit", label: "En tránsito", count: regionBucketCounts.in_transit },
+                { key: "cancelled", label: "Cancelados", count: regionBucketCounts.cancelled },
+              ] as const
+            ).map((b) => {
+              const active = regionChartBucket === b.key;
+              return (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => setRegionChartBucket((prev) => (prev === b.key ? "all" : b.key))}
+                  className={[
+                    "rounded-xl border px-3 py-2 text-left transition-all duration-base ease-standard",
+                    active
+                      ? "border-primary/30 bg-primary/[0.04] shadow-glow"
+                      : "border-border/60 bg-card hover:border-border hover:shadow-elev-1",
+                  ].join(" ")}
+                  aria-pressed={active}
+                  title="Filtrar el gráfico por estado"
+                >
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{b.label}</div>
+                  <div className="mt-0.5 text-sm font-semibold text-foreground tabular-nums">{b.count}</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">en el periodo del gráfico</div>
+                </button>
+              );
+            })}
+          </div>
+
           {vizRegion && regionVizMetrics && (
             <div className="space-y-3 border-t border-border pt-4">
               <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -841,6 +1025,63 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Días promedio de entrega por región ── */}
+      <Card>
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <CardTitle>Demora de entregas por región (promedio)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {deliveryDaysByRegion.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Sin entregas con fecha de reporte válida en este periodo / filtros.
+            </p>
+          ) : (
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deliveryDaysByRegion} margin={{ top: 8, right: 16, left: 8, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.4} />
+                  <XAxis
+                    dataKey="region"
+                    tick={{ fill: chartTheme.tick, fontSize: 10 }}
+                    interval={0}
+                    angle={-18}
+                    textAnchor="end"
+                    height={78}
+                  />
+                  <YAxis
+                    tick={{ fill: chartTheme.tick, fontSize: 11 }}
+                    tickFormatter={(v) => `${v}d`}
+                    allowDecimals
+                  />
+                  <Tooltip
+                    cursor={{ fill: "hsl(var(--accent)/0.3)" }}
+                    {...chartTheme.tooltip}
+                    formatter={(value: number, name: string, payload: any) => {
+                      if (name === "avgDays") {
+                        const n = payload?.payload?.deliveredCount ?? 0;
+                        return [`${value} días (n=${n})`, "Promedio"];
+                      }
+                      return [String(value), name];
+                    }}
+                  />
+                  <Bar dataKey="avgDays" name="avgDays" radius={[6, 6, 0, 0]}>
+                    {deliveryDaysByRegion.map((entry) => (
+                      <Cell key={entry.region} fill={regionChartColor(entry.region)} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Calculado con pedidos <span className="font-medium text-foreground/80">ENTREGADOS</span>: diferencia entre{" "}
+            <span className="font-medium text-foreground/80">FECHA</span> y{" "}
+            <span className="font-medium text-foreground/80">FECHA DE REPORTE</span> del Excel. Respeta tu filtro de
+            producto y logística.
+          </p>
         </CardContent>
       </Card>
 
@@ -1055,6 +1296,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       )}
 
       {/* ── Lista de pedidos ── */}
+      <div ref={listRef} />
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1069,15 +1311,68 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                   )
                 </span>
               </CardTitle>
-              <p className="text-xs text-muted-foreground">
-                CPA general:{" "}
-                <span className="font-semibold text-foreground tabular-nums">
-                  {metrics.cpa != null ? formatMoney(metrics.cpa) : "—"}
-                </span>
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {[
+                    {
+                      label: "CPA general",
+                      value: metrics.cpa != null ? formatMoney(metrics.cpa) : "—",
+                      hint: "Ads / entregados",
+                    },
+                    {
+                      label: "Envíos (total)",
+                      value: formatMoney(shippingTotal),
+                      hint: "Suma PRECIO FLETE",
+                    },
+                    {
+                      label: "Ganancia (real)",
+                      value: formatMoney(metrics.gananciaReal),
+                      hint: "Solo entregados",
+                    },
+                    {
+                      label: "Ticket promedio",
+                      value: formatMoney(metrics.aov),
+                      hint: "AOV",
+                    },
+                  ].map((m) => (
+                    <div
+                      key={m.label}
+                      className="rounded-xl border border-border/50 bg-muted/20 px-3 py-2"
+                    >
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {m.label}
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-foreground tabular-nums">
+                        {m.value}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
+                        {m.hint}
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 {metrics.cpa == null && (
-                  <span className="ml-1">(añade gasto en anuncios y pedidos entregados)</span>
+                  <p className="text-[11px] text-muted-foreground">
+                    Para ver CPA, añade gasto en anuncios y asegúrate de tener pedidos entregados.
+                  </p>
                 )}
-              </p>
+              </div>
+              {statusLabel && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="tabular-nums">
+                    Estado: {statusLabel}
+                  </Badge>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-muted-foreground"
+                    onClick={() => setStatusBucket("all")}
+                  >
+                    Quitar filtro
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-center lg:max-w-xl">
               <div className="relative min-w-0 flex-1">
@@ -1390,7 +1685,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                   const profit = o.profit ?? 0;
                   const ship = o.shipping_price ?? 0;
                   const cpaGeneral = metrics.cpa ?? 0;
-                  const gananciaAprox = profit - cpaGeneral;
+                  // La "ganancia aprox." descuenta CPA solo para ENTREGADOS.
+                  // En otros estados (cancelado, tránsito, devolución, etc.) el descuento no aplica y confunde.
+                  const appliesCpa = o.status_bucket === "delivered";
+                  const gananciaAprox = appliesCpa && metrics.cpa != null ? profit - cpaGeneral : profit;
                   const margenPct = sale > 0 ? Math.round((gananciaAprox / sale) * 1000) / 10 : 0;
                   return (
                     <Card key={o.id}>
@@ -1467,7 +1765,8 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
           )}
           <p className="text-[11px] text-muted-foreground mt-3">
             <span className="font-semibold text-foreground/80">CPA general</span> = inversión Meta del rango / pedidos entregados.{" "}
-            <span className="font-semibold text-foreground/80">Ganancia aprox.</span> = ganancia del pedido − CPA general.{" "}
+            <span className="font-semibold text-foreground/80">Ganancia aprox.</span> = ganancia del pedido
+            {metrics.cpa != null ? " (solo entregados) − CPA general" : ""}.{" "}
             <span className="font-semibold text-foreground/80">Margen</span> = ganancia aprox. / venta.
           </p>
         </CardContent>

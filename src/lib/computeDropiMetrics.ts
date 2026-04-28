@@ -415,6 +415,53 @@ export function aggregateOrdersByRegion(orders: DropiOrderForMetrics[]): RegionO
     .sort((a, b) => b.count - a.count);
 }
 
+export type RegionDeliveryDaysRow = {
+  region: string;
+  /** Días promedio entre FECHA y FECHA DE REPORTE para entregados. */
+  avgDays: number;
+  /** Cantidad de entregados con fechas válidas usados en el promedio. */
+  deliveredCount: number;
+};
+
+function dayDiff(fromIso: string, toIso: string): number | null {
+  const a = new Date(fromIso + "T12:00:00");
+  const b = new Date(toIso + "T12:00:00");
+  const ms = b.getTime() - a.getTime();
+  if (!Number.isFinite(ms)) return null;
+  const days = ms / 86_400_000;
+  if (!Number.isFinite(days)) return null;
+  // No permitimos negativos por datos inconsistentes.
+  return Math.max(0, days);
+}
+
+/**
+ * Días promedio de entrega por región (Chile) usando solo pedidos ENTREGADOS.
+ * Aproximación: diferencia entre `order_date` (FECHA) y `report_date` (FECHA DE REPORTE) del Excel.
+ */
+export function aggregateDeliveryDaysByRegion(orders: DropiOrderForMetrics[]): RegionDeliveryDaysRow[] {
+  const m = new Map<string, { sum: number; n: number }>();
+  for (const o of orders) {
+    if (o.status_bucket !== "delivered") continue;
+    const rd = (o.report_date ?? "").slice(0, 10);
+    const od = (o.order_date ?? "").slice(0, 10);
+    if (!rd || !od) continue;
+    const d = dayDiff(od, rd);
+    if (d == null) continue;
+    const k = regionKey(o);
+    const cur = m.get(k) ?? { sum: 0, n: 0 };
+    cur.sum += d;
+    cur.n += 1;
+    m.set(k, cur);
+  }
+  return [...m.entries()]
+    .map(([region, v]) => ({
+      region,
+      avgDays: v.n > 0 ? Math.round((v.sum / v.n) * 10) / 10 : 0,
+      deliveredCount: v.n,
+    }))
+    .sort((a, b) => b.deliveredCount - a.deliveredCount || a.avgDays - b.avgDays);
+}
+
 export function attributedMetaSpend(metaSpend: number, sliceCount: number, baseCount: number): number {
   if (baseCount <= 0 || sliceCount <= 0) return 0;
   return metaSpend * (sliceCount / baseCount);

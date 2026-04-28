@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import {
   clearDropiSessionPrefs,
@@ -8,7 +8,6 @@ import {
 } from '@/lib/dropiSessionPrefs';
 import { resetDropiImportedDataForUser } from '@/lib/resetDropiImportedData';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
-import type { Tables } from '../integrations/supabase/types';
 
 interface User {
   id: string;
@@ -56,10 +55,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Ref con el id del usuario actualmente "vivo": cualquier promesa async (loadUserProfile,
+  // side-effects de SIGNED_IN) que termine cuando ya cambió el id la descartamos. Evita
+  // resucitar un user después de un logout.
+  const currentUserIdRef = useRef<string | null>(null);
+
   const isAuthenticated = !!user && !!user.id;
 
-  // Construir un perfil "rápido" desde la sesión de Supabase para setear el usuario
-  // inmediatamente; el perfil completo se carga en background.
+  // Perfil "rápido" desde la sesión de Supabase, para desbloquear la UI al instante.
+  // El perfil completo se hidrata en background.
   const buildQuickUser = (supabaseUser: SupabaseUser): User => ({
     id: supabaseUser.id,
     email: supabaseUser.email || '',
@@ -69,179 +73,161 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     createdAt: new Date().toISOString(),
   });
 
-  // Verificar autenticación al cargar la aplicación
+  // Aplica el usuario a partir de una sesión de Supabase, gestionando side-effects
+  // que solo deben correr en un login "fresco" (no en INITIAL_SESSION ni token refresh).
+  const applySession = (supabaseUser: SupabaseUser, opts: { fresh: boolean }) => {
+    const uid = supabaseUser.id;
+    currentUserIdRef.current = uid;
+    setUser(buildQuickUser(supabaseUser));
+    setIsLoading(false);
+
+    if (opts.fresh) {
+      const expectFresh = consumeExpectFreshDropiLogin();
+      if (expectFresh) {
+        clearDropiSessionPrefs(uid);
+        try { localStorage.removeItem('dropi:lastImportAt'); } catch { /* noop */ }
+        resetDropiImportedDataForUser(uid).catch(() => { /* best effort */ });
+      }
+    }
+
+    // Hidratar el perfil completo sin bloquear la UI.
+    loadUserProfile(supabaseUser).catch(() => { /* perfil rápido ya seteado */ });
+  };
+
+  // Único punto de escucha de cambios de auth. Supabase v2 dispara INITIAL_SESSION
+  // automáticamente al suscribirse, así que NO necesitamos un getSession() manual.
   useEffect(() => {
     let isMounted = true;
 
-    const checkAuth = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
 
-        if (!isMounted) return;
-
-        if (sessionError) {
-          console.warn('⚠️ Error de sesión, limpiando:', sessionError.message);
-          await supabase.auth.signOut();
-          return;
-        }
-
-        if (session?.user) {
-          setUser(buildQuickUser(session.user));
-          // Hidratar perfil completo en background (no bloquea el render)
-          loadUserProfile(session.user).catch(() => { /* ya hay perfil rápido */ });
-        }
-      } catch (err) {
-        console.error('❌ Error verificando sesión:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    // Escuchar cambios de sesión. Fuente única de verdad para el estado del usuario.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
-
-        if (event === 'SIGNED_IN' && session?.user) {
-          const uid = session.user.id;
-          const freshLogin = consumeExpectFreshDropiLogin();
-          if (freshLogin) {
-            clearDropiSessionPrefs(uid);
-            try {
-              localStorage.removeItem('dropi:lastImportAt');
-            } catch {
-              /* noop */
-            }
-            await resetDropiImportedDataForUser(uid);
+      switch (event) {
+        case 'INITIAL_SESSION': {
+          // Estado inicial al cargar la app. Si hay sesión persistida, entra; si no,
+          // simplemente terminamos el loading sin tocar nada del servidor.
+          if (session?.user) {
+            applySession(session.user, { fresh: false });
+          } else {
+            currentUserIdRef.current = null;
+            setUser(null);
+            setIsLoading(false);
           }
-          // Setear usuario inmediatamente para desbloquear la UI
-          setUser(buildQuickUser(session.user));
-          setIsLoading(false);
-          // Hidratar perfil completo sin bloquear
-          loadUserProfile(session.user).catch(() => { /* perfil rápido ya seteado */ });
-        } else if (event === 'SIGNED_OUT') {
+          break;
+        }
+        case 'SIGNED_IN': {
+          if (session?.user) applySession(session.user, { fresh: true });
+          break;
+        }
+        case 'TOKEN_REFRESHED': {
+          // Token renovado. Mantenemos el usuario; solo refrescamos campos básicos
+          // por si Supabase actualizó email o metadata.
+          if (session?.user) {
+            currentUserIdRef.current = session.user.id;
+            setUser((prev) => prev ? { ...prev, email: session.user.email || prev.email } : buildQuickUser(session.user));
+          }
+          break;
+        }
+        case 'USER_UPDATED': {
+          if (session?.user) {
+            currentUserIdRef.current = session.user.id;
+            setUser(buildQuickUser(session.user));
+            loadUserProfile(session.user).catch(() => { /* noop */ });
+          }
+          break;
+        }
+        case 'SIGNED_OUT': {
+          currentUserIdRef.current = null;
           setUser(null);
           setIsLoading(false);
+          break;
         }
+        // PASSWORD_RECOVERY y otros: no necesitamos acción específica.
+        default:
+          break;
       }
-    );
+    });
+
+    // Failsafe: si en 8s no llegó INITIAL_SESSION (raro, pero protege contra cuelgues
+    // del cliente), salimos del loading para no dejar la app en pantalla de carga.
+    const failsafe = setTimeout(() => {
+      if (isMounted) setIsLoading(false);
+    }, 8000);
 
     return () => {
       isMounted = false;
+      clearTimeout(failsafe);
       subscription.unsubscribe();
     };
   }, []);
 
   const loadUserProfile = async (supabaseUser: SupabaseUser) => {
+    const uid = supabaseUser.id;
+    // Si la sesión cambió antes de empezar, no hacemos nada.
+    if (currentUserIdRef.current !== uid) return;
+
     try {
-      console.log('Cargando perfil para usuario:', supabaseUser.id);
-      
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', supabaseUser.id)
+        .eq('id', uid)
         .single();
 
+      // Si entre tanto el usuario cambió o cerró sesión, descartar el resultado.
+      if (currentUserIdRef.current !== uid) return;
+
       if (error) {
-        console.error('Error cargando perfil:', error);
-        
-        // Si no existe el perfil, crear uno básico
+        // Perfil no existe → crearlo. Cualquier otro error: dejamos el perfil "rápido".
         if (error.code === 'PGRST116') {
-          console.log('Creando perfil para usuario existente...');
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              id: supabaseUser.id,
-              email: supabaseUser.email || '',
-              first_name: supabaseUser.user_metadata?.first_name || 'Usuario',
-              last_name: supabaseUser.user_metadata?.last_name || '',
-            });
-
-          if (insertError) {
-            console.error('Error creando perfil:', insertError);
-            // Crear un perfil básico en memoria si falla la inserción
-            setUser({
-              id: supabaseUser.id,
-              email: supabaseUser.email || '',
-              firstName: supabaseUser.user_metadata?.first_name || 'Usuario',
-              lastName: supabaseUser.user_metadata?.last_name || '',
-              isActive: true,
-              createdAt: new Date().toISOString(),
-            });
-            return;
-          }
-
-          // Recargar el perfil después de crearlo
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', supabaseUser.id)
-            .single();
-
-          if (newProfile) {
-            setUser({
-              id: newProfile.id,
-              email: newProfile.email,
-              firstName: newProfile.first_name,
-              lastName: newProfile.last_name,
-              isActive: newProfile.is_active,
-              createdAt: newProfile.created_at,
-            });
-          }
-        } else {
-          // Para otros errores, crear un perfil básico en memoria
-          setUser({
-            id: supabaseUser.id,
+          await supabase.from('profiles').insert({
+            id: uid,
             email: supabaseUser.email || '',
-            firstName: supabaseUser.user_metadata?.first_name || 'Usuario',
-            lastName: supabaseUser.user_metadata?.last_name || '',
-            isActive: true,
-            createdAt: new Date().toISOString(),
+            first_name: supabaseUser.user_metadata?.first_name || 'Usuario',
+            last_name: supabaseUser.user_metadata?.last_name || '',
           });
         }
         return;
       }
 
-      console.log('Perfil cargado exitosamente:', profile);
+      if (currentUserIdRef.current !== uid) return;
       setUser({
         id: profile.id,
         email: profile.email,
         firstName: profile.first_name,
         lastName: profile.last_name,
-        isActive: true, // profiles table doesn't have is_active field
+        isActive: true,
         createdAt: profile.created_at,
       });
-    } catch (error) {
-      console.error('Error cargando perfil:', error);
-      // En caso de error, crear un perfil básico en memoria
-      setUser({
-        id: supabaseUser.id,
-        email: supabaseUser.email || '',
-        firstName: supabaseUser.user_metadata?.first_name || 'Usuario',
-        lastName: supabaseUser.user_metadata?.last_name || '',
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      });
+    } catch (err) {
+      console.warn('Perfil no se pudo hidratar, manteniendo perfil rápido:', err);
     }
+  };
+
+  const mapAuthErrorMessage = (msg: string): string => {
+    if (msg.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.';
+    if (msg.includes('Email not confirmed')) return 'Por favor confirma tu email antes de iniciar sesión.';
+    if (msg.includes('Too many requests')) return 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
+    if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
+      return 'Error de conexión. Verifica tu internet y que la app pueda conectar con Supabase.';
+    }
+    if (msg === 'LOGIN_TIMEOUT') {
+      return 'La conexión con Supabase tardó demasiado. Verifica tu conexión a internet e intenta nuevamente.';
+    }
+    return msg || 'Error inesperado al iniciar sesión';
   };
 
   const login = async (email: string, password: string) => {
     setError(null);
 
-    // Login de prueba solo si está habilitado por env (nunca en producción)
+    // Login de prueba solo si está habilitado por env (nunca en producción).
     const allowTestLogin = import.meta.env.VITE_ALLOW_TEST_LOGIN === 'true';
     const testEmail = import.meta.env.VITE_TEST_LOGIN_EMAIL;
     const testPassword = import.meta.env.VITE_TEST_LOGIN_PASSWORD;
     if (allowTestLogin && testEmail && testPassword && email === testEmail && password === testPassword) {
       clearDropiSessionPrefs('test-user-12345');
-      try {
-        localStorage.removeItem('dropi:lastImportAt');
-      } catch {
-        /* noop */
-      }
+      try { localStorage.removeItem('dropi:lastImportAt'); } catch { /* noop */ }
       clearExpectFreshDropiLoginMarker();
+      currentUserIdRef.current = 'test-user-12345';
       setUser({
         id: 'test-user-12345',
         email: testEmail,
@@ -254,93 +240,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
 
+    markExpectFreshDropiLogin();
+
+    // Race: (a) respuesta de la API, (b) evento SIGNED_IN del listener global, (c) timeout.
+    // El (b) cubre el bug de supabase-js donde signInWithPassword no resuelve aunque
+    // la auth haya tenido éxito.
     const LOGIN_TIMEOUT_MS = 15000;
 
-    // Escuchamos SIGNED_IN como "backup": si el cliente Supabase-JS no resuelve
-    // la promesa de signInWithPassword (bug conocido bajo ciertas condiciones),
-    // el evento SIGNED_IN sí se dispara y lo usamos para considerar el login exitoso.
-    let signedInSub: { unsubscribe: () => void } | null = null;
-    const signedInPromise = new Promise<void>((resolve) => {
-      const { data } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) resolve();
-      });
-      signedInSub = data.subscription;
+    let signedInResolved = false;
+    let onSignedIn!: () => void;
+    const signedInPromise = new Promise<'event'>((resolve) => {
+      onSignedIn = () => { signedInResolved = true; resolve('event'); };
+    });
+    const { data: { subscription: signedInSub } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) onSignedIn();
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('LOGIN_TIMEOUT')), LOGIN_TIMEOUT_MS);
     });
 
-    markExpectFreshDropiLogin();
-
-    let authError: Error | null = null;
-    const authPromise = supabase.auth.signInWithPassword({ email, password }).then(
-      (res) => {
-        if (res.error) {
-          authError = res.error;
-          throw res.error;
-        }
-        return res;
-      },
-      (err) => {
-        authError = err instanceof Error ? err : new Error(String(err));
-        throw authError;
-      }
-    );
-    // Evitar unhandled rejection si signedInPromise gana pero authPromise falla después.
-    authPromise.catch(() => { /* error capturado en authError */ });
+    const authPromise = supabase.auth.signInWithPassword({ email, password }).then((res) => {
+      if (res.error) throw res.error;
+      return 'api' as const;
+    });
+    // Suppress unhandled rejection si el evento gana antes que la API rechace.
+    authPromise.catch(() => { /* manejado en el race */ });
 
     try {
-      // Ganador: (a) respuesta de la API, (b) evento SIGNED_IN o (c) timeout.
-      // Si authPromise rechaza con error real de credenciales, lo relanzamos; si gana
-      // signedInPromise, el login fue correcto vía evento.
       await Promise.race([authPromise, signedInPromise, timeoutPromise]);
-      if (authError) throw authError;
-      // En cualquier caso de éxito, onAuthStateChange ya setea el usuario.
+      // Si ganó el evento, no necesitamos esperar la respuesta de la API.
     } catch (err: unknown) {
+      // Si el evento ya se resolvió antes que el error, consideramos el login OK
+      // (el listener global ya seteó al usuario).
+      if (signedInResolved) return;
+
       const msg = err instanceof Error ? err.message : String(err);
-      let errorMessage = 'Error inesperado al iniciar sesión';
-      if (msg.includes('Invalid login credentials')) {
-        errorMessage = 'Email o contraseña incorrectos.';
-      } else if (msg.includes('Email not confirmed')) {
-        errorMessage = 'Por favor confirma tu email antes de iniciar sesión.';
-      } else if (msg.includes('Too many requests')) {
-        errorMessage = 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
-      } else if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
-        errorMessage = 'Error de conexión. Verifica tu internet y que la app pueda conectar con Supabase.';
-      } else if (msg === 'LOGIN_TIMEOUT') {
-        errorMessage = 'La conexión con Supabase tardó demasiado. Verifica tu conexión a internet e intenta nuevamente. Si el problema persiste, el proyecto puede estar pausado en el Dashboard.';
-      } else if (msg) {
-        errorMessage = msg;
-      }
+      const errorMessage = mapAuthErrorMessage(msg);
       setError(errorMessage);
       clearExpectFreshDropiLoginMarker();
-      throw err;
+      throw err instanceof Error ? err : new Error(errorMessage);
     } finally {
-      signedInSub?.unsubscribe();
+      signedInSub.unsubscribe();
     }
   };
 
   const loginWithGoogle = async () => {
+    setError(null);
+    markExpectFreshDropiLogin();
     try {
-      setError(null);
-      markExpectFreshDropiLogin();
-      const redirectTo = `${window.location.origin}/dashboard`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo },
+        options: { redirectTo: `${window.location.origin}/dashboard` },
       });
-      if (error) {
-        setError(error.message);
-        clearExpectFreshDropiLoginMarker();
-        throw error;
-      }
-      // La redirección a Google la hace Supabase; al volver, onAuthStateChange actualizará el usuario
-    } catch (error: any) {
-      console.error('Error login con Google:', error);
+      if (error) throw error;
+      // La redirección a Google la hace Supabase; al volver, onAuthStateChange actualiza el usuario.
+    } catch (err: unknown) {
       clearExpectFreshDropiLoginMarker();
-      setError(error?.message || 'Error al iniciar sesión con Google');
-      throw error;
+      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión con Google';
+      setError(msg);
+      throw err;
     }
   };
 
@@ -350,12 +309,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     firstName: string;
     lastName: string;
   }) => {
+    setError(null);
     try {
-      setError(null);
-      setIsLoading(true);
-      
-      console.log('🚀 Iniciando registro para:', userData.email);
-      
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,
         password: userData.password,
@@ -363,20 +318,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           data: {
             first_name: userData.firstName,
             last_name: userData.lastName,
-          }
-        }
+          },
+        },
       });
 
-      if (error) {
-        console.error('❌ Error en registro:', error);
-        setError(error.message);
-        throw error;
-      }
+      if (error) throw error;
 
       if (data.user) {
-        console.log('✅ Usuario registrado exitosamente:', data.user.email);
-        
-        // Crear perfil en la tabla profiles (sin esperar)
+        // Crear perfil en background; el modal de verificación de email gestiona el flujo.
         supabase
           .from('profiles')
           .insert({
@@ -386,43 +335,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             last_name: userData.lastName,
           })
           .then(({ error: profileError }) => {
-            if (profileError) {
-              console.error('Error creando perfil:', profileError);
-            } else {
-              console.log('✅ Perfil creado exitosamente');
-            }
+            if (profileError) console.warn('Error creando perfil tras registro:', profileError);
           });
-
-        // NO cargar perfil ni redirigir automáticamente
-        // El modal se encargará de mostrar la verificación
-        console.log('🎉 Registro completado, mostrando modal de verificación');
       }
-    } catch (error: any) {
-      console.error('Error en registro:', error);
-      setError(error.message || 'Error inesperado al registrarse');
-      throw error;
-    } finally {
-      setIsLoading(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error inesperado al registrarse';
+      setError(msg);
+      throw err;
     }
   };
 
   const logout = async () => {
     const sessionUserId = user?.id;
+    // Limpiar inmediatamente el estado local: la UI no debe seguir creyéndose autenticada
+    // ni una décima de segundo aunque Supabase tarde en responder.
+    currentUserIdRef.current = null;
+    setUser(null);
+    if (sessionUserId) clearDropiSessionPrefs(sessionUserId);
+    try { localStorage.removeItem('dropi:lastImportAt'); } catch { /* noop */ }
+
     try {
       await supabase.auth.signOut();
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-    } finally {
-      if (sessionUserId) clearDropiSessionPrefs(sessionUserId);
-      try {
-        localStorage.removeItem('dropi:lastImportAt');
-      } catch {
-        /* noop */
-      }
-      setUser(null);
-      // Redirigir a la landing page después del logout
-      window.location.href = '/';
+      console.warn('Error al cerrar sesión en Supabase (estado local ya limpio):', error);
     }
+    // Hard redirect a la landing para garantizar un estado limpio (caches de queries,
+    // websockets, listeners, etc.) sin tener que invalidar manualmente cada uno.
+    window.location.href = '/';
   };
 
   const updateProfile = async (profileData: {
