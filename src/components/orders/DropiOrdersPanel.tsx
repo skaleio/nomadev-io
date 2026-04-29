@@ -133,6 +133,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importStage, setImportStage] = useState<string | null>(null);
+  const [dragOverImport, setDragOverImport] = useState(false);
   const [chartPeriodDays, setChartPeriodDays] = useState<1 | 7 | 14 | 30>(30);
   const [vizRegion, setVizRegion] = useState<string | null>(null);
   const [regionChartBucket, setRegionChartBucket] = useState<
@@ -454,10 +455,8 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     }
   };
 
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !userId) return;
+  const importDropiFile = useCallback(async (file: File) => {
+    if (!userId) return;
     if (!file.name.toLowerCase().endsWith(".xlsx")) {
       toast.error("Formato no admitido. Usa un archivo Excel de exportación de guías.");
       return;
@@ -522,6 +521,13 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       setImporting(false);
       setImportStage(null);
     }
+  }, [userId]);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    await importDropiFile(file);
   };
 
   const confirmPostImport = async () => {
@@ -652,7 +658,48 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
             </p>
           </CardContent>
         ) : (
-          <CardContent className="flex flex-wrap gap-4 items-end">
+          <CardContent
+            className="relative flex flex-wrap gap-4 items-end"
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (importing) return;
+              setDragOverImport(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (importing) return;
+              setDragOverImport(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragOverImport(false);
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDragOverImport(false);
+              if (importing) return;
+              const f = e.dataTransfer?.files?.[0];
+              if (!f) return;
+              await importDropiFile(f);
+            }}
+            aria-label="Área de importación (puedes arrastrar un archivo aquí)"
+          >
+            {dragOverImport && !importing && (
+              <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-primary/50 bg-primary/[0.06] backdrop-blur-sm">
+                <div className="flex h-full items-center justify-center p-6">
+                  <div className="rounded-2xl border border-primary/25 bg-background/60 px-5 py-4 text-center shadow-elev-2">
+                    <p className="text-sm font-semibold text-foreground">Suelta el archivo aquí</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Importaremos tus guías automáticamente (Excel de Dropi).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             <NomaDatePicker
               label="Desde (FECHA pedido)"
               value={dateFrom}
@@ -677,6 +724,9 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                 disabled={importing}
                 className="max-w-xs"
               />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                También puedes <span className="font-medium text-foreground/80">arrastrar y soltar</span> el archivo aquí.
+              </p>
             </div>
             <Button variant="outline" size="sm" onClick={() => void loadOrders()} disabled={loading}>
               <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />

@@ -5,11 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CustomCursor } from "@/components/ui/custom-cursor";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
-import { LoadingScreen } from "./components/ui/loading-logo";
 // import { SimpleCommandPalette } from "./components/ui/simple-command-palette";
 // import { useSimpleCommandPalette } from "./hooks/useSimpleCommandPalette";
 // import { setupApiInterceptors } from "./lib/api"; // Removed - no longer needed
@@ -68,19 +67,14 @@ const queryClient = new QueryClient();
 
 // Configuración de API manejada por Supabase directamente
 
-// Componente interno que muestra loading mientras Auth carga
+// AppContent NO bloquea por isLoading: las rutas públicas renderizan al instante
+// y ProtectedRoute muestra su propio loader solo cuando hace falta.
 const AppContent = () => {
-  const { isLoading } = useAuth();
-
-  if (isLoading) {
-    return <LoadingScreen message="Cargando aplicación..." />;
-  }
-
   return (
     <>
       <Toaster />
       <Sonner />
-      
+
       <BrowserRouter>
         <Routes>
               {/* Rutas públicas */}

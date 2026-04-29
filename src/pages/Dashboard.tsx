@@ -170,8 +170,8 @@ export default function Dashboard() {
                     Empieza importando tus pedidos Dropi
                   </h3>
                   <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                    Sube el .xlsx de Dropi y registra tu gasto en Meta del periodo. Dashboard, ROAS,
-                    CPA y precio sugerido se calculan al instante.
+                    Importa tus guías de pedidos y registra tu inversión en Meta del periodo. Las métricas de
+                    rentabilidad (ROAS, CPA y precio sugerido) se actualizan al instante.
                   </p>
                 </div>
               </div>
