@@ -25,7 +25,6 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "../../contexts/AuthContext";
-// import { useSimpleCommandPalette } from "../../hooks/useSimpleCommandPalette";
 import { supabase } from "../../integrations/supabase/client";
 
 type NavItem = {
@@ -59,7 +58,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname;
   const { user } = useAuth();
-  // const { openCommandPalette } = useSimpleCommandPalette();
   const [metrics, setMetrics] = useState({
     visitors: 0,
     sales: 0,

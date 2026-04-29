@@ -26,7 +26,12 @@ import {
   List,
   Settings,
   ArrowUpDown,
-  EyeOff
+  EyeOff,
+  Users,
+  Target,
+  Activity,
+  AlertTriangle,
+  Inbox
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,6 +75,14 @@ interface PipelineStage {
   leads: Lead[];
   totalValue: number;
 }
+
+const formatCrmCurrency = (amount: number) =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
 
 const CRMPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,42 +187,109 @@ const CRMPage: React.FC = () => {
     return stages;
   };
 
-  // Métricas del CRM
+  const STALE_CONTACT_DAYS = 7;
+
+  // KPIs calculados desde los leads en cada etapa (fuente única de verdad)
   const crmMetrics = useMemo(() => {
-    const totalLeads = pipelineStages.reduce((sum, stage) => sum + stage.leads.length, 0);
-    const totalValue = pipelineStages.reduce((sum, stage) => sum + stage.totalValue, 0);
-    const closedValue = pipelineStages.find(stage => stage.id === 'cerrado')?.totalValue || 0;
-    const conversionRate = totalValue > 0 ? (closedValue / totalValue) * 100 : 0;
+    const stageValue = (s: PipelineStage) =>
+      s.leads.reduce((sum, lead) => sum + (Number(lead.value) || 0), 0);
+
+    const totalLeads = pipelineStages.reduce((sum, s) => sum + s.leads.length, 0);
+    const openStages = pipelineStages.filter((s) => s.id !== 'cerrado');
+    const closedStage = pipelineStages.find((s) => s.id === 'cerrado');
+    const openPipelineValue = openStages.reduce((sum, s) => sum + stageValue(s), 0);
+    const closedValue = closedStage ? stageValue(closedStage) : 0;
+    const closedCount = closedStage?.leads.length ?? 0;
+
+    const nuevoStage = pipelineStages.find((s) => s.id === 'nuevo');
+    const nuevoCount = nuevoStage?.leads.length ?? 0;
+
+    const progressIds = ['calificado', 'propuesta', 'negociacion'] as const;
+    const inProgressCount = progressIds.reduce((acc, id) => {
+      const st = pipelineStages.find((s) => s.id === id);
+      return acc + (st?.leads.length ?? 0);
+    }, 0);
+
+    const now = Date.now();
+    const staleMs = STALE_CONTACT_DAYS * 24 * 60 * 60 * 1000;
+    let staleFollowUpCount = 0;
+    for (const stage of pipelineStages) {
+      if (stage.id === 'cerrado') continue;
+      for (const lead of stage.leads) {
+        const t = new Date(lead.lastContact).getTime();
+        if (!Number.isNaN(t) && now - t > staleMs) staleFollowUpCount++;
+      }
+    }
+
+    const totalWeightedValue = pipelineStages.reduce((sum, s) => sum + stageValue(s), 0);
+    const avgTicket = totalLeads > 0 ? totalWeightedValue / totalLeads : 0;
+    const conversionRate = totalLeads > 0 ? (closedCount / totalLeads) * 100 : 0;
+
+    const iconWrap = {
+      default: 'rounded-lg bg-gray-800/80 p-2 text-gray-300',
+      positive: 'rounded-lg bg-emerald-500/15 p-2 text-emerald-400',
+      pipeline: 'rounded-lg bg-sky-500/15 p-2 text-sky-400',
+      warning: 'rounded-lg bg-amber-500/15 p-2 text-amber-400',
+      danger: 'rounded-lg bg-red-500/15 p-2 text-red-400',
+    } as const;
 
     return [
       {
-        title: "Leads Totales",
-        value: totalLeads.toString(),
-        change: { value: 0, type: "increase" as const },
-        icon: User,
-        color: "primary" as const
+        title: 'Leads totales',
+        hint: 'En todas las etapas del pipeline',
+        value: totalLeads.toLocaleString('es-CL'),
+        icon: Users,
+        iconClass: iconWrap.default,
       },
       {
-        title: "Valor Total",
-        value: `$${totalValue.toLocaleString()}`,
-        change: { value: 0, type: "increase" as const },
-        icon: DollarSign,
-        color: "success" as const
-      },
-      {
-        title: "Valor Cerrado",
-        value: `$${closedValue.toLocaleString()}`,
-        change: { value: 0, type: "increase" as const },
-        icon: CheckCircle,
-        color: "success" as const
-      },
-      {
-        title: "Tasa Conversión",
-        value: `${conversionRate.toFixed(1)}%`,
-        change: { value: 0, type: "increase" as const },
+        title: 'Valor pipeline abierto',
+        hint: 'Oportunidades fuera de “Cerrado”',
+        value: formatCrmCurrency(openPipelineValue),
         icon: TrendingUp,
-        color: "warning" as const
-      }
+        iconClass: iconWrap.pipeline,
+      },
+      {
+        title: 'Valor ganado',
+        hint: 'Suma en etapa Cerrado',
+        value: formatCrmCurrency(closedValue),
+        icon: CheckCircle,
+        iconClass: iconWrap.positive,
+      },
+      {
+        title: 'Tasa de cierre',
+        hint: 'Leads cerrados / leads totales',
+        value: totalLeads > 0 ? `${conversionRate.toFixed(1)} %` : '—',
+        icon: Target,
+        iconClass: iconWrap.positive,
+      },
+      {
+        title: 'Ticket medio',
+        hint: 'Valor promedio por lead',
+        value: totalLeads > 0 ? formatCrmCurrency(avgTicket) : '—',
+        icon: DollarSign,
+        iconClass: iconWrap.default,
+      },
+      {
+        title: 'Nuevos (entrantes)',
+        hint: 'En etapa Nuevo',
+        value: nuevoCount.toLocaleString('es-CL'),
+        icon: Inbox,
+        iconClass: iconWrap.pipeline,
+      },
+      {
+        title: 'En progreso',
+        hint: 'Calificado, Propuesta o Negociación',
+        value: inProgressCount.toLocaleString('es-CL'),
+        icon: Activity,
+        iconClass: iconWrap.default,
+      },
+      {
+        title: 'Sin seguimiento',
+        hint: `Sin contacto hace más de ${STALE_CONTACT_DAYS} días (excl. cerrados)`,
+        value: staleFollowUpCount.toLocaleString('es-CL'),
+        icon: AlertTriangle,
+        iconClass: staleFollowUpCount > 0 ? iconWrap.danger : iconWrap.default,
+      },
     ];
   }, [pipelineStages]);
 
@@ -297,15 +377,6 @@ const CRMPage: React.FC = () => {
     }));
   }, [pipelineStages, searchTerm, selectedStage]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CL', {
       year: 'numeric',
@@ -339,21 +410,32 @@ const CRMPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {crmMetrics.map((metric, index) => (
-            <Card key={metric.title} className="bg-gray-900/50 border-gray-700">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-400 text-sm">{metric.title}</p>
-                    <p className="text-2xl font-bold text-white">{metric.value}</p>
+        {/* KPIs — lectura rápida del estado del pipeline */}
+        <div>
+          <h2 className="text-lg font-semibold text-white mb-3">Métricas clave</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {crmMetrics.map((metric) => (
+              <Card
+                key={metric.title}
+                className="bg-gray-900/50 border-gray-700/80 hover:border-gray-600/80 transition-colors"
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-gray-400 text-sm font-medium leading-tight">{metric.title}</p>
+                      <p className="text-2xl font-bold text-white tracking-tight truncate" title={metric.value}>
+                        {metric.value}
+                      </p>
+                      <p className="text-gray-500 text-xs leading-snug">{metric.hint}</p>
+                    </div>
+                    <div className={metric.iconClass} aria-hidden>
+                      <metric.icon className="w-5 h-5 shrink-0" />
+                    </div>
                   </div>
-                  <metric.icon className="w-8 h-8 text-gray-400" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
         {/* Filtros */}
@@ -425,7 +507,7 @@ const CRMPage: React.FC = () => {
                     </Badge>
                   </div>
                   <p className="text-gray-400 text-xs">
-                    {formatCurrency(stage.totalValue)}
+                    {formatCrmCurrency(stage.totalValue)}
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -486,7 +568,7 @@ const CRMPage: React.FC = () => {
                           </div>
                           <div className="space-y-1">
                             <p className="text-green-400 font-semibold text-sm">
-                              {formatCurrency(lead.value)}
+                              {formatCrmCurrency(lead.value)}
                             </p>
                             <p className="text-gray-400 text-xs">
                               Último contacto: {formatDate(lead.lastContact)}
@@ -542,7 +624,7 @@ const CRMPage: React.FC = () => {
                   <div className="space-y-4">
                     <div>
                       <Label className="text-gray-400">Valor</Label>
-                      <p className="text-green-400 font-semibold">{formatCurrency(selectedLead.value)}</p>
+                      <p className="text-green-400 font-semibold">{formatCrmCurrency(selectedLead.value)}</p>
                     </div>
                     <div>
                       <Label className="text-gray-400">Fuente</Label>

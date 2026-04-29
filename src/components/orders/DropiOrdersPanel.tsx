@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NomaDatePicker } from "@/components/ui/noma-date-picker";
@@ -14,6 +14,7 @@ import { parseDropiXlsxArrayBuffer, toSupabaseInsertRows } from "@/lib/dropiImpo
 import { readDropiSessionPrefs, writeDropiSessionPrefs, type DropiPanelSessionPrefsV1 } from "@/lib/dropiSessionPrefs";
 import {
   aggregateOrdersByRegion,
+  aggregateOrdersByRegionStatusStack,
   aggregateDeliveryDaysByRegion,
   attributedMetaSpend,
   carrierKey,
@@ -147,6 +148,9 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const listRef = React.useRef<HTMLDivElement | null>(null);
   /** Oculta el bloque de importación (persiste en sessionStorage hasta cerrar sesión / pestaña). */
   const [importCardCollapsed, setImportCardCollapsed] = useState(false);
+  /** Categorías extra solo para el gráfico de demora por región (vacío = usa el filtro de producto del panel). */
+  const [deliveryLagCategoryKeys, setDeliveryLagCategoryKeys] = useState<string[]>([]);
+  const [deliveryLagFilterOpen, setDeliveryLagFilterOpen] = useState(false);
   /** Evita escribir prefs por defecto antes de leer la sesión guardada. */
   const [sessionHydrated, setSessionHydrated] = useState(false);
   const [postImport, setPostImport] = useState<{
@@ -368,6 +372,28 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     [ordersForChartWindow, product, carrier],
   );
 
+  /** Categorías disponibles en el periodo del gráfico (para filtro multiselect del gráfico de demora). */
+  const deliveryLagCategoryOptions = useMemo(() => {
+    const base = filterDropiOrders(ordersForChartWindow, { region: "all", product: "all", carrier });
+    const map = new Map<string, number>();
+    for (const o of base) {
+      const k = (o.categories ?? "").trim() || "Sin categoría";
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return [...map.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
+      .map(([name, count]) => ({ value: name, label: name, count }));
+  }, [ordersForChartWindow, carrier]);
+
+  const ordersForDeliveryLagChart = useMemo(() => {
+    if (deliveryLagCategoryKeys.length === 0) return ordersChartProductOnly;
+    const set = new Set(deliveryLagCategoryKeys);
+    return filterDropiOrders(ordersForChartWindow, { region: "all", product: "all", carrier }).filter((o) => {
+      const cat = (o.categories ?? "").trim() || "Sin categoría";
+      return set.has(cat);
+    });
+  }, [ordersChartProductOnly, ordersForChartWindow, carrier, deliveryLagCategoryKeys]);
+
   const regionChartOrders = useMemo(() => {
     if (regionChartBucket === "all") return ordersChartProductOnly;
     return ordersChartProductOnly.filter((o) => o.status_bucket === regionChartBucket);
@@ -380,10 +406,32 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
   const regionBars = useMemo(() => aggregateOrdersByRegion(regionChartOrders), [regionChartOrders]);
 
-  const deliveryDaysByRegion = useMemo(
-    () => aggregateDeliveryDaysByRegion(ordersChartProductOnly),
+  /** Base para vista “Todos”: mismos pedidos que el periodo del gráfico (producto + logística). */
+  const regionBarsStacked = useMemo(
+    () => aggregateOrdersByRegionStatusStack(ordersChartProductOnly),
     [ordersChartProductOnly],
   );
+
+  const regionStackShowsOther = useMemo(() => regionBarsStacked.some((r) => r.other > 0), [regionBarsStacked]);
+
+  const deliveryDaysByRegion = useMemo(
+    () => aggregateDeliveryDaysByRegion(ordersForDeliveryLagChart),
+    [ordersForDeliveryLagChart],
+  );
+
+  const deliveryLagYAxisMax = useMemo(() => {
+    if (deliveryDaysByRegion.length === 0) return 10;
+    const max = Math.max(...deliveryDaysByRegion.map((r) => r.avgDays), 0);
+    const step = 5;
+    return Math.max(step, Math.ceil(max / step) * step);
+  }, [deliveryDaysByRegion]);
+
+  const deliveryLagYTicks = useMemo(() => {
+    const n = deliveryLagYAxisMax / 5;
+    const ticks: number[] = [];
+    for (let i = 0; i <= n; i++) ticks.push(i * 5);
+    return ticks;
+  }, [deliveryLagYAxisMax]);
 
   const regionBucketCounts = useMemo(() => {
     const base = ordersChartProductOnly;
@@ -398,13 +446,25 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
   const regionChartTitle = useMemo(() => {
     switch (regionChartBucket) {
-      case "delivered": return "Entregados por región";
+      case "delivered": return "Entregas por región";
       case "return_flow": return "Devoluciones por región";
       case "cancelled": return "Cancelados por región";
       case "in_transit": return "En tránsito por región";
       default: return "Pedidos por región";
     }
   }, [regionChartBucket]);
+
+  /** Colores alineados al gráfico apilado y a los recuadros de filtro. */
+  const regionStatusChartColors = useMemo(
+    () => ({
+      delivered: "hsl(var(--success))",
+      in_transit: "hsl(199 89% 48%)",
+      return_flow: "hsl(38 92% 50%)",
+      cancelled: "hsl(var(--destructive))",
+      other: "hsl(var(--muted-foreground) / 0.65)",
+    }),
+    [],
+  );
 
   const metaSpend = useMemo(() => {
     const n = Number(String(metaInput).replace(/\s/g, "").replace(",", "."));
@@ -585,8 +645,14 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     grid: "hsl(var(--border))",
     tick: "hsl(var(--muted-foreground))",
     tooltip: {
-      contentStyle: { backgroundColor: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "8px" },
-      labelStyle: { color: "hsl(var(--foreground))", fontWeight: 500 },
+      contentStyle: {
+        backgroundColor: "rgba(17, 17, 22, 0.96)",
+        border: "1px solid rgba(255, 255, 255, 0.14)",
+        borderRadius: "8px",
+        color: "#fff",
+      },
+      labelStyle: { color: "#fff", fontWeight: 500 },
+      itemStyle: { color: "#fff" },
     },
     success: "hsl(var(--success))",
     primary: "hsl(var(--primary))",
@@ -779,7 +845,14 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
           </div>
           <div className="mt-5 space-y-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vista por producto</p>
-            <Select value={product} onValueChange={setProduct} disabled={loading || productFilterOptions.length <= 1}>
+            <Select
+              value={product}
+              onValueChange={(v) => {
+                setProduct(v);
+                setDeliveryLagCategoryKeys([]);
+              }}
+              disabled={loading || productFilterOptions.length <= 1}
+            >
               <SelectTrigger className="h-10 w-full border-border/60 bg-background/80 text-left text-foreground">
                 <SelectValue placeholder="Todos los productos" />
               </SelectTrigger>
@@ -965,93 +1038,261 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         </CardContent>
       </Card>
 
-      {/* ── Pedidos por región ── */}
+      {/* ── Pedidos por región (apilado o por estado) ── */}
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle>{regionChartTitle}</CardTitle>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>{regionChartTitle}</CardTitle>
+            {regionChartBucket === "all" ? (
+              <CardDescription>
+                Vista <span className="font-medium text-foreground/90">Todos</span>: cada barra apila{" "}
+                <span className="whitespace-nowrap">entregas</span>,{" "}
+                <span className="whitespace-nowrap">en tránsito</span>,{" "}
+                <span className="whitespace-nowrap">devoluciones</span> y{" "}
+                <span className="whitespace-nowrap">cancelados</span> por región. Elige un recuadro debajo para ver solo
+                ese estado.
+              </CardDescription>
+            ) : (
+              <CardDescription>
+                Mostrando solo pedidos en estado seleccionado; orden por cantidad por región. Clic en una barra para KPIs
+                de la región.
+              </CardDescription>
+            )}
+          </div>
           {vizRegion && (
-            <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setVizRegion(null)}>
+            <Button size="sm" variant="ghost" className="text-muted-foreground shrink-0" onClick={() => setVizRegion(null)}>
               Quitar selección
             </Button>
           )}
         </CardHeader>
-        <CardContent className="space-y-6">
-          {regionBars.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin datos para el periodo del gráfico y producto seleccionado.</p>
+        <CardContent className="space-y-0">
+          {ordersChartProductOnly.length === 0 ? (
+            <p className="text-sm text-muted-foreground pb-4">Sin datos para el periodo del gráfico y filtros de producto/logística.</p>
+          ) : regionChartBucket === "all" && regionBarsStacked.length === 0 ? (
+            <p className="text-sm text-muted-foreground pb-4">Sin pedidos agrupables por región en este periodo.</p>
+          ) : regionChartBucket !== "all" && regionBars.length === 0 ? (
+            <p className="text-sm text-muted-foreground pb-4">No hay pedidos con este estado en el periodo del gráfico.</p>
           ) : (
-            <div className="h-[280px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={regionBars}
-                  margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
-                  onClick={(s) => {
-                    const p = s?.activePayload?.[0]?.payload as { region?: string } | undefined;
-                    const r = p?.region;
-                    if (r) setVizRegion((prev) => (prev === r ? null : r));
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.4} />
-                  <XAxis dataKey="region" tick={{ fill: chartTheme.tick, fontSize: 10 }} interval={0} angle={-18} textAnchor="end" height={72} />
-                  <YAxis tick={{ fill: chartTheme.tick, fontSize: 11 }} allowDecimals={false} />
-                  <Tooltip cursor={{ fill: "hsl(var(--accent)/0.3)" }} {...chartTheme.tooltip} />
-                  <Bar dataKey="count" name="Pedidos" radius={[6, 6, 0, 0]}>
-                    {regionBars.map((entry) => {
-                      const fill = regionChartColor(entry.region);
-                      const selected = vizRegion === entry.region;
-                      const dimmed = vizRegion != null && !selected;
-                      return (
-                        <Cell
-                          key={entry.region}
-                          fill={fill}
-                          fillOpacity={dimmed ? 0.38 : 1}
-                          stroke={selected ? "hsl(var(--foreground))" : "transparent"}
-                          strokeWidth={selected ? 2 : 0}
-                          className="cursor-pointer transition-[opacity] duration-200"
+            <>
+              <div
+                className={[
+                  "w-full rounded-xl border border-border/50 bg-muted/15 px-1 pt-2",
+                  regionChartBucket === "all" ? "h-[300px]" : "h-[280px]",
+                ].join(" ")}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  {regionChartBucket === "all" ? (
+                    <BarChart
+                      data={regionBarsStacked}
+                      margin={{ top: 10, right: 12, left: 4, bottom: 6 }}
+                      barCategoryGap="14%"
+                      onClick={(s) => {
+                        const p = s?.activePayload?.[0]?.payload as { region?: string } | undefined;
+                        const r = p?.region;
+                        if (r) setVizRegion((prev) => (prev === r ? null : r));
+                      }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke={chartTheme.grid}
+                        strokeOpacity={0.45}
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="region"
+                        tick={{ fill: chartTheme.tick, fontSize: 9 }}
+                        tickFormatter={(v) => String(v).toUpperCase()}
+                        interval={0}
+                        angle={-32}
+                        textAnchor="end"
+                        height={88}
+                        tickLine={{ stroke: chartTheme.grid }}
+                      />
+                      <YAxis tick={{ fill: chartTheme.tick, fontSize: 11 }} allowDecimals={false} width={36} tickLine={false} />
+                      <Tooltip cursor={{ fill: "hsl(var(--accent)/0.22)" }} {...chartTheme.tooltip} />
+                      <Bar
+                        dataKey="delivered"
+                        name="Entregas"
+                        stackId="a"
+                        fill={regionStatusChartColors.delivered}
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="in_transit"
+                        name="En tránsito"
+                        stackId="a"
+                        fill={regionStatusChartColors.in_transit}
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="return_flow"
+                        name="Devoluciones"
+                        stackId="a"
+                        fill={regionStatusChartColors.return_flow}
+                        radius={[0, 0, 0, 0]}
+                      />
+                      {regionStackShowsOther ? (
+                        <>
+                          <Bar
+                            dataKey="cancelled"
+                            name="Cancelados"
+                            stackId="a"
+                            fill={regionStatusChartColors.cancelled}
+                            radius={[0, 0, 0, 0]}
+                          />
+                          <Bar
+                            dataKey="other"
+                            name="Otros estados"
+                            stackId="a"
+                            fill={regionStatusChartColors.other}
+                            radius={[10, 10, 0, 0]}
+                          />
+                        </>
+                      ) : (
+                        <Bar
+                          dataKey="cancelled"
+                          name="Cancelados"
+                          stackId="a"
+                          fill={regionStatusChartColors.cancelled}
+                          radius={[10, 10, 0, 0]}
                         />
-                      );
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Clic en una barra para ver KPIs de esa región. El gasto en anuncios se reparte proporcionalmente al volumen de pedidos.
-          </p>
+                      )}
+                    </BarChart>
+                  ) : (
+                    <BarChart
+                      data={regionBars}
+                      margin={{ top: 10, right: 12, left: 4, bottom: 6 }}
+                      barCategoryGap="14%"
+                      onClick={(s) => {
+                        const p = s?.activePayload?.[0]?.payload as { region?: string } | undefined;
+                        const r = p?.region;
+                        if (r) setVizRegion((prev) => (prev === r ? null : r));
+                      }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke={chartTheme.grid}
+                        strokeOpacity={0.45}
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="region"
+                        tick={{ fill: chartTheme.tick, fontSize: 9 }}
+                        tickFormatter={(v) => String(v).toUpperCase()}
+                        interval={0}
+                        angle={-32}
+                        textAnchor="end"
+                        height={88}
+                        tickLine={{ stroke: chartTheme.grid }}
+                      />
+                      <YAxis tick={{ fill: chartTheme.tick, fontSize: 11 }} allowDecimals={false} width={36} tickLine={false} />
+                      <Tooltip cursor={{ fill: "hsl(var(--accent)/0.22)" }} {...chartTheme.tooltip} />
+                      <Bar dataKey="count" name="Pedidos" radius={[8, 8, 0, 0]} maxBarSize={52}>
+                        {regionBars.map((entry) => {
+                          const fill = regionChartColor(entry.region);
+                          const selected = vizRegion === entry.region;
+                          const dimmed = vizRegion != null && !selected;
+                          return (
+                            <Cell
+                              key={entry.region}
+                              fill={fill}
+                              fillOpacity={dimmed ? 0.38 : 1}
+                              stroke={selected ? "hsl(var(--foreground))" : "transparent"}
+                              strokeWidth={selected ? 2 : 0}
+                              className="cursor-pointer transition-[opacity] duration-200"
+                            />
+                          );
+                        })}
+                      </Bar>
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
 
-          {/* ── Filtro por estado (para el gráfico) ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {(
-              [
-                { key: "all", label: "Todos", count: regionBucketCounts.all },
-                { key: "delivered", label: "Entregados", count: regionBucketCounts.delivered },
-                { key: "return_flow", label: "Devoluciones", count: regionBucketCounts.return_flow },
-                { key: "in_transit", label: "En tránsito", count: regionBucketCounts.in_transit },
-                { key: "cancelled", label: "Cancelados", count: regionBucketCounts.cancelled },
-              ] as const
-            ).map((b) => {
-              const active = regionChartBucket === b.key;
-              return (
-                <button
-                  key={b.key}
-                  type="button"
-                  onClick={() => setRegionChartBucket((prev) => (prev === b.key ? "all" : b.key))}
-                  className={[
-                    "rounded-xl border px-3 py-2 text-left transition-all duration-base ease-standard",
-                    active
-                      ? "border-primary/30 bg-primary/[0.04] shadow-glow"
-                      : "border-border/60 bg-card hover:border-border hover:shadow-elev-1",
-                  ].join(" ")}
-                  aria-pressed={active}
-                  title="Filtrar el gráfico por estado"
-                >
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{b.label}</div>
-                  <div className="mt-0.5 text-sm font-semibold text-foreground tabular-nums">{b.count}</div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5">en el periodo del gráfico</div>
-                </button>
-              );
-            })}
-          </div>
+              {/* Recuadros bajo el gráfico: filtro por estado (zona tipo leyenda / referencia) */}
+              <div className="mt-3 border-t border-border/70 pt-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-2">
+                  Ver por estado
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                  {(
+                    [
+                      {
+                        key: "all" as const,
+                        label: "Todos",
+                        sub: "Apilado",
+                        count: regionBucketCounts.all,
+                        strip: `linear-gradient(180deg, ${regionStatusChartColors.delivered} 0%, ${regionStatusChartColors.in_transit} 33%, ${regionStatusChartColors.return_flow} 66%, ${regionStatusChartColors.cancelled} 100%)`,
+                      },
+                      {
+                        key: "delivered" as const,
+                        label: "Entregas",
+                        sub: "Solo entregados",
+                        count: regionBucketCounts.delivered,
+                        strip: regionStatusChartColors.delivered,
+                      },
+                      {
+                        key: "return_flow" as const,
+                        label: "Devoluciones",
+                        sub: "En devolución",
+                        count: regionBucketCounts.return_flow,
+                        strip: regionStatusChartColors.return_flow,
+                      },
+                      {
+                        key: "in_transit" as const,
+                        label: "En tránsito",
+                        sub: "En ruta",
+                        count: regionBucketCounts.in_transit,
+                        strip: regionStatusChartColors.in_transit,
+                      },
+                      {
+                        key: "cancelled" as const,
+                        label: "Cancelados",
+                        sub: "Anulados",
+                        count: regionBucketCounts.cancelled,
+                        strip: regionStatusChartColors.cancelled,
+                      },
+                    ] as const
+                  ).map((b) => {
+                    const active = regionChartBucket === b.key;
+                    return (
+                      <button
+                        key={b.key}
+                        type="button"
+                        onClick={() => setRegionChartBucket(b.key)}
+                        className={[
+                          "relative overflow-hidden rounded-xl border pl-3.5 pr-2.5 py-2.5 text-left transition-all duration-base ease-standard",
+                          active
+                            ? "border-primary/45 bg-primary/[0.07] shadow-glow ring-1 ring-primary/25"
+                            : "border-border/60 bg-card/90 hover:border-border hover:shadow-elev-1",
+                        ].join(" ")}
+                        aria-pressed={active}
+                      >
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-0 bottom-0 w-1"
+                          style={
+                            b.key === "all"
+                              ? { background: b.strip }
+                              : { backgroundColor: b.strip as string }
+                          }
+                        />
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{b.label}</div>
+                        <div className="mt-0.5 text-lg font-bold text-foreground tabular-nums leading-tight">{b.count}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{b.sub}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-4 leading-relaxed">
+                Periodo del gráfico: {chartBounds.chartFrom} → {chartBounds.chartTo}. Respeta categoría de producto y
+                logística. Clic en una barra para KPIs de la región. El gasto en anuncios se reparte proporcionalmente al
+                volumen de pedidos.
+              </p>
+            </>
+          )}
 
           {vizRegion && regionVizMetrics && (
             <div className="space-y-3 border-t border-border pt-4">
@@ -1080,44 +1321,170 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
       {/* ── Días promedio de entrega por región ── */}
       <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <CardTitle>Demora de entregas por región (promedio)</CardTitle>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <CardTitle>Días promedio de entrega por región</CardTitle>
+              <CardDescription>
+                Promedio de días entre la fecha del pedido y la fecha de reporte, solo guías{" "}
+                <span className="font-medium text-foreground/90">entregadas</span>. Periodo del gráfico:{" "}
+                {chartBounds.chartFrom} → {chartBounds.chartTo}.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Popover open={deliveryLagFilterOpen} onOpenChange={setDeliveryLagFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5">
+                    <Filter className="size-3.5" strokeWidth={2} />
+                    Categorías (este gráfico)
+                    {deliveryLagCategoryKeys.length > 0 ? (
+                      <Badge variant="soft" className="ml-0.5 tabular-nums">
+                        {deliveryLagCategoryKeys.length}
+                      </Badge>
+                    ) : null}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[min(100vw-2rem,360px)] p-0" align="end">
+                  <Command className="rounded-lg border-0">
+                    <CommandInput placeholder="Buscar categoría…" />
+                    <CommandList className="max-h-[min(50vh,280px)]">
+                      <CommandEmpty>Sin categorías en este periodo.</CommandEmpty>
+                      <CommandGroup heading="Incluir en el gráfico (puedes elegir varias)">
+                        {deliveryLagCategoryOptions.map((opt) => {
+                          const selected = deliveryLagCategoryKeys.includes(opt.value);
+                          return (
+                            <CommandItem
+                              key={opt.value}
+                              value={opt.label}
+                              onSelect={() => {
+                                setDeliveryLagCategoryKeys((prev) =>
+                                  prev.includes(opt.value) ? prev.filter((k) => k !== opt.value) : [...prev, opt.value],
+                                );
+                              }}
+                            >
+                              <Check className={`mr-2 size-4 shrink-0 ${selected ? "opacity-100" : "opacity-0"}`} />
+                              <span className="truncate">
+                                {opt.label} <span className="text-muted-foreground tabular-nums">({opt.count})</span>
+                              </span>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                  <div className="border-t border-border p-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-muted-foreground"
+                      onClick={() => {
+                        setDeliveryLagCategoryKeys([]);
+                        setDeliveryLagFilterOpen(false);
+                      }}
+                    >
+                      Volver al filtro general de producto
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <div className="min-w-[200px]">
+                <label className="sr-only">Categoría (mismo filtro que arriba)</label>
+                <Select
+                  value={product}
+                  onValueChange={(v) => {
+                    setProduct(v);
+                    setDeliveryLagCategoryKeys([]);
+                  }}
+                  disabled={loading || productFilterOptions.length <= 1}
+                >
+                  <SelectTrigger className="h-9 border-border/60 bg-background/80 text-xs">
+                    <SelectValue placeholder="Producto (panel)" />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-[min(60vh,320px)]">
+                    {productFilterOptions.map((opt) => (
+                      <SelectItem key={opt.value === "all" ? "__all__" : opt.label} value={opt.value}>
+                        {opt.value === "all" ? opt.label : `${opt.label} (${opt.count})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {deliveryLagCategoryKeys.length > 0 ? (
+              <>
+                <span className="font-medium text-foreground/85">Solo categorías elegidas:</span>{" "}
+                {deliveryLagCategoryKeys.join(", ")}.
+              </>
+            ) : (
+              <>
+                Usando la categoría del filtro general
+                {product !== "all" ? (
+                  <>
+                    :{" "}
+                    <span className="font-medium text-foreground/85">
+                      {productFilterOptions.find((o) => o.value === product)?.label ?? product}
+                    </span>
+                  </>
+                ) : (
+                  <> (todas las categorías del periodo).</>
+                )}
+              </>
+            )}{" "}
+            Logística: {carrier === "all" ? "todas" : carrier}.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {deliveryDaysByRegion.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Sin entregas con fecha de reporte válida en este periodo / filtros.
+              Sin entregas con fechas válidas (pedido y reporte) para armar el promedio con los filtros actuales.
             </p>
           ) : (
-            <div className="h-[300px]">
+            <div className="h-[320px] w-full rounded-xl border border-border/40 bg-muted/20 px-1 pt-2">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deliveryDaysByRegion} margin={{ top: 8, right: 16, left: 8, bottom: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} opacity={0.4} />
+                <BarChart
+                  data={deliveryDaysByRegion}
+                  margin={{ top: 12, right: 12, left: 4, bottom: 8 }}
+                  barCategoryGap="12%"
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={chartTheme.grid}
+                    strokeOpacity={0.45}
+                    vertical={false}
+                  />
                   <XAxis
                     dataKey="region"
                     tick={{ fill: chartTheme.tick, fontSize: 10 }}
                     interval={0}
-                    angle={-18}
+                    angle={-45}
                     textAnchor="end"
-                    height={78}
+                    height={96}
+                    tickLine={{ stroke: chartTheme.grid }}
                   />
                   <YAxis
                     tick={{ fill: chartTheme.tick, fontSize: 11 }}
-                    tickFormatter={(v) => `${v}d`}
+                    tickFormatter={(v) => `${v} d`}
+                    domain={[0, deliveryLagYAxisMax]}
+                    ticks={deliveryLagYTicks}
                     allowDecimals
+                    width={40}
+                    tickLine={false}
                   />
                   <Tooltip
-                    cursor={{ fill: "hsl(var(--accent)/0.3)" }}
+                    cursor={{ fill: "hsl(var(--accent)/0.25)" }}
                     {...chartTheme.tooltip}
-                    formatter={(value: number, name: string, payload: any) => {
+                    formatter={(value: number, name: string, payload: { payload?: { deliveredCount?: number } }) => {
                       if (name === "avgDays") {
                         const n = payload?.payload?.deliveredCount ?? 0;
-                        return [`${value} días (n=${n})`, "Promedio"];
+                        return [`${value} días · ${n} entregas`, "Promedio"];
                       }
                       return [String(value), name];
                     }}
                   />
-                  <Bar dataKey="avgDays" name="avgDays" radius={[6, 6, 0, 0]}>
+                  <Bar dataKey="avgDays" name="avgDays" radius={[10, 10, 0, 0]} maxBarSize={56}>
                     {deliveryDaysByRegion.map((entry) => (
                       <Cell key={entry.region} fill={regionChartColor(entry.region)} />
                     ))}
@@ -1126,11 +1493,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
               </ResponsiveContainer>
             </div>
           )}
-          <p className="text-xs text-muted-foreground">
-            Calculado con pedidos <span className="font-medium text-foreground/80">ENTREGADOS</span>: diferencia entre{" "}
-            <span className="font-medium text-foreground/80">FECHA</span> y{" "}
-            <span className="font-medium text-foreground/80">FECHA DE REPORTE</span> del Excel. Respeta tu filtro de
-            producto y logística.
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Cálculo: <span className="font-medium text-foreground/80">FECHA DE REPORTE</span> −{" "}
+            <span className="font-medium text-foreground/80">FECHA</span> del archivo importado. Orden: mayor demora a la
+            izquierda. Para comparar varias líneas de producto a la vez, usa &quot;Categorías (este gráfico)&quot;.
           </p>
         </CardContent>
       </Card>
@@ -1601,6 +1967,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                                     value={`${opt.label} ${opt.count}`}
                                     onSelect={() => {
                                       setProduct(opt.value);
+                                      setDeliveryLagCategoryKeys([]);
                                       setProductFilterOpen(false);
                                     }}
                                     className="cursor-pointer"
@@ -1695,6 +2062,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                         setRegion("all");
                         setProduct("all");
                         setCarrier("all");
+                        setDeliveryLagCategoryKeys([]);
                       }}
                     >
                       Limpiar filtros

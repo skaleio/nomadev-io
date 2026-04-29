@@ -9,9 +9,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
-// import { SimpleCommandPalette } from "./components/ui/simple-command-palette";
-// import { useSimpleCommandPalette } from "./hooks/useSimpleCommandPalette";
-// import { setupApiInterceptors } from "./lib/api"; // Removed - no longer needed
 import ProtectedRoute from "./components/ProtectedRoute";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
@@ -64,8 +61,6 @@ import { EmailVerificationPage } from "./pages/EmailVerificationPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
-
-// Configuración de API manejada por Supabase directamente
 
 // AppContent NO bloquea por isLoading: las rutas públicas renderizan al instante
 // y ProtectedRoute muestra su propio loader solo cuando hace falta.

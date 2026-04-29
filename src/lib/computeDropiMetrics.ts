@@ -415,6 +415,52 @@ export function aggregateOrdersByRegion(orders: DropiOrderForMetrics[]): RegionO
     .sort((a, b) => b.count - a.count);
 }
 
+/** Conteos por región para gráfico apilado (entregas, devoluciones, cancelados, en tránsito + otros). */
+export type RegionStatusStackRow = {
+  region: string;
+  delivered: number;
+  return_flow: number;
+  cancelled: number;
+  in_transit: number;
+  /** pending, issue, etc. */
+  other: number;
+  total: number;
+};
+
+export function aggregateOrdersByRegionStatusStack(orders: DropiOrderForMetrics[]): RegionStatusStackRow[] {
+  const m = new Map<string, { delivered: number; return_flow: number; cancelled: number; in_transit: number; other: number }>();
+  for (const o of orders) {
+    const k = regionKey(o);
+    const cur = m.get(k) ?? { delivered: 0, return_flow: 0, cancelled: 0, in_transit: 0, other: 0 };
+    switch (o.status_bucket) {
+      case "delivered":
+        cur.delivered += 1;
+        break;
+      case "return_flow":
+        cur.return_flow += 1;
+        break;
+      case "cancelled":
+        cur.cancelled += 1;
+        break;
+      case "in_transit":
+        cur.in_transit += 1;
+        break;
+      default:
+        cur.other += 1;
+        break;
+    }
+    m.set(k, cur);
+  }
+  return [...m.entries()]
+    .map(([region, v]) => ({
+      region,
+      ...v,
+      total: v.delivered + v.return_flow + v.cancelled + v.in_transit + v.other,
+    }))
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
 export type RegionDeliveryDaysRow = {
   region: string;
   /** Días promedio entre FECHA y FECHA DE REPORTE para entregados. */
@@ -459,7 +505,8 @@ export function aggregateDeliveryDaysByRegion(orders: DropiOrderForMetrics[]): R
       avgDays: v.n > 0 ? Math.round((v.sum / v.n) * 10) / 10 : 0,
       deliveredCount: v.n,
     }))
-    .sort((a, b) => b.deliveredCount - a.deliveredCount || a.avgDays - b.avgDays);
+    /** Mayor demora a la izquierda (mismo criterio visual que “Pedidos por región” con barras descendentes). */
+    .sort((a, b) => b.avgDays - a.avgDays || b.deliveredCount - a.deliveredCount || a.region.localeCompare(b.region, "es"));
 }
 
 export function attributedMetaSpend(metaSpend: number, sliceCount: number, baseCount: number): number {

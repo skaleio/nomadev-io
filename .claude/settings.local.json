@@ -28,7 +28,8 @@
       "mcp__claude_ai_Notion__notion-create-pages",
       "Bash(echo \"EXIT: $?\")",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npm run *)"
     ],
     "deny": [],
     "ask": []
