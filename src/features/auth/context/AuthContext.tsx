@@ -17,6 +17,8 @@ interface User {
   lastName: string;
   /** Foto de perfil (p. ej. OAuth Google: `picture` o `avatar_url` en user_metadata). */
   avatarUrl?: string;
+  phone?: string;
+  address?: string;
   isActive: boolean;
   createdAt: string;
   /** Timestamp ISO. Si está presente, el onboarding ya fue visto. Vive en `auth.users.user_metadata.onboarding_completed_at`. */
@@ -96,6 +98,8 @@ interface AuthContextType {
     firstName?: string;
     lastName?: string;
     email?: string;
+    phone?: string;
+    address?: string;
   }) => Promise<void>;
   updatePassword: (passwordData: {
     currentPassword: string;
@@ -141,7 +145,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('id,email,first_name,last_name,created_at')
+        .select('id,email,first_name,last_name,phone,address,avatar_url,created_at')
         .eq('id', uid)
         .single();
 
@@ -163,12 +167,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (currentUserIdRef.current !== uid) return;
+      const oauthAvatar = avatarFromSupabaseUser(supabaseUser);
+      const dbAvatar =
+        typeof profile.avatar_url === 'string' && profile.avatar_url.trim().length > 0
+          ? profile.avatar_url.trim()
+          : undefined;
       commitUser({
         id: profile.id,
-        email: profile.email,
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        avatarUrl: avatarFromSupabaseUser(supabaseUser),
+        email: profile.email ?? supabaseUser.email ?? '',
+        firstName: profile.first_name ?? '',
+        lastName: profile.last_name ?? '',
+        avatarUrl: dbAvatar ?? oauthAvatar,
+        phone: profile.phone ?? undefined,
+        address: profile.address ?? undefined,
         isActive: true,
         createdAt: profile.created_at,
         onboardingCompletedAt: onboardingCompletedAtFromSupabaseUser(supabaseUser),
@@ -431,20 +442,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     firstName?: string;
     lastName?: string;
     email?: string;
+    phone?: string;
+    address?: string;
   }) => {
     setError(null);
     if (!user) throw new Error('Usuario no autenticado');
 
+    const nextEmail = profileData.email?.trim() ?? user.email;
+    const nextFirst = profileData.firstName ?? user.firstName;
+    const nextLast = profileData.lastName ?? user.lastName;
+    const nextPhone = profileData.phone?.trim() || null;
+    const nextAddress = profileData.address?.trim() || null;
+
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          first_name: profileData.firstName,
-          last_name: profileData.lastName,
-          email: profileData.email,
-        })
-        .eq('id', user.id);
-      if (error) throw error;
+      if (nextEmail !== user.email) {
+        const { error: emailErr } = await supabase.auth.updateUser({ email: nextEmail });
+        if (emailErr) throw emailErr;
+      }
+
+      const { error: metaErr } = await supabase.auth.updateUser({
+        data: {
+          first_name: nextFirst,
+          last_name: nextLast,
+        },
+      });
+      if (metaErr) throw metaErr;
+
+      const { error: upsertErr } = await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          email: nextEmail,
+          first_name: nextFirst,
+          last_name: nextLast,
+          phone: nextPhone,
+          address: nextAddress,
+        },
+        { onConflict: 'id' },
+      );
+      if (upsertErr) throw upsertErr;
 
       const { data: { user: supabaseUser } } = await supabase.auth.getUser();
       if (supabaseUser) await loadUserProfile(supabaseUser);

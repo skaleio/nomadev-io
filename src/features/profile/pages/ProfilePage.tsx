@@ -5,26 +5,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  User,
+  Mail,
   Calendar,
   Edit,
   Save,
   X,
   Settings,
-  Upload
 } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 export default function ProfilePage() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, error, clearError } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    const raw = searchParams.get("edit");
+    if (raw === "1" || raw?.toLowerCase() === "true") {
+      setIsEditing(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [isLoading, setIsLoading] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(user?.avatar || null);
+  const [profileImage, setProfileImage] = useState<string | null>(user?.avatarUrl ?? null);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
@@ -32,6 +39,30 @@ export default function ProfilePage() {
     phone: user?.phone || '',
     address: user?.address || '',
   });
+
+  useEffect(() => {
+    return () => clearError();
+  }, [clearError]);
+
+  useEffect(() => {
+    if (!user) return;
+    setFormData({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      phone: user.phone || '',
+      address: user.address || '',
+    });
+    setProfileImage(user.avatarUrl ?? null);
+  }, [
+    user?.id,
+    user?.firstName,
+    user?.lastName,
+    user?.email,
+    user?.phone,
+    user?.address,
+    user?.avatarUrl,
+  ]);
 
   const handleSave = async () => {
     try {
@@ -42,6 +73,8 @@ export default function ProfilePage() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
       });
       
       setIsEditing(false);
@@ -62,7 +95,7 @@ export default function ProfilePage() {
       phone: user?.phone || '',
       address: user?.address || '',
     });
-    setProfileImage(user?.avatar || null);
+    setProfileImage(user?.avatarUrl ?? null);
     setIsEditing(false);
   };
 
@@ -100,6 +133,11 @@ export default function ProfilePage() {
           <p className="text-muted-foreground">
             Gestiona tu información personal y configuración de cuenta
           </p>
+          {error ? (
+            <p className="text-sm text-destructive mt-2" role="alert">
+              {error}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

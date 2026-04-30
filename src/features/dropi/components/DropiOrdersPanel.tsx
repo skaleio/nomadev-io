@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -114,10 +114,16 @@ const BUCKET_LABEL: Record<string, string> = {
   pending: "Pendiente",
 };
 
-const STATUS_METRIC_MODAL_TITLE: Record<
-  "all" | "in_transit" | "delivered" | "pending" | "issue" | "return_flow" | "cancelled",
-  string
-> = {
+type OrderStatusBucket =
+  | "all"
+  | "in_transit"
+  | "delivered"
+  | "pending"
+  | "issue"
+  | "return_flow"
+  | "cancelled";
+
+const STATUS_METRIC_MODAL_TITLE: Record<OrderStatusBucket, string> = {
   all: "Todos los pedidos",
   in_transit: "Confirmados (en tránsito / reparto)",
   delivered: "Entregados",
@@ -126,6 +132,39 @@ const STATUS_METRIC_MODAL_TITLE: Record<
   return_flow: "En devolución",
   cancelled: "Cancelados",
 };
+
+type FinancialMetricKey =
+  | "total_vendido"
+  | "ganancia_real"
+  | "ganancia_estimada"
+  | "ganancia_promedio"
+  | "inversion_meta"
+  | "roas_ventas"
+  | "roas_real"
+  | "cpa"
+  | "aov"
+  | "pct_ganancia_real"
+  | "pct_ganancia_estimada"
+  | "top_region"
+  | "vista_producto";
+
+const FINANCIAL_METRIC_MODAL_TITLE: Record<FinancialMetricKey, string> = {
+  total_vendido: "Total vendido — detalle",
+  ganancia_real: "Ganancia real — pedidos entregados",
+  ganancia_estimada: "Ganancia estimada — no cancelados",
+  ganancia_promedio: "Ganancia promedio — por entregado",
+  inversion_meta: "Inversión Meta",
+  roas_ventas: "ROAS ventas — desglose",
+  roas_real: "ROAS real — desglose",
+  cpa: "CPA — base de pedidos entregados",
+  aov: "Ticket promedio (AOV)",
+  pct_ganancia_real: "% Ganancia real",
+  pct_ganancia_estimada: "% Ganancia estimada",
+  top_region: "Top región — entregados",
+  vista_producto: "Vista por producto",
+};
+
+type PanelOrdersModal = { source: "status"; bucket: OrderStatusBucket } | { source: "metric"; metric: FinancialMetricKey };
 
 type BucketVariant = "success" | "destructive" | "warning" | "info" | "soft";
 
@@ -149,9 +188,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [region, setRegion] = useState("all");
   const [product, setProduct] = useState("all");
   const [carrier, setCarrier] = useState("all");
-  const [statusBucket, setStatusBucket] = useState<
-    "all" | "in_transit" | "delivered" | "pending" | "issue" | "return_flow" | "cancelled"
-  >("all");
+  const [statusBucket, setStatusBucket] = useState<OrderStatusBucket>("all");
   const [metaInput, setMetaInput] = useState("");
   const [orders, setOrders] = useState<DropiOrderRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -168,8 +205,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [productFilterOpen, setProductFilterOpen] = useState(false);
   const [carrierFilterOpen, setCarrierFilterOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState("");
-  /** Modal con guías al hacer clic en tarjetas de estado (sin scroll a la lista). */
-  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  /** Modal con guías al hacer clic en tarjetas de métricas o estado. */
+  const [panelOrdersModal, setPanelOrdersModal] = useState<PanelOrdersModal | null>(null);
+  /** Si true, al cerrar el modal se quita el filtro de estado de la lista (solo aplica a tarjetas de estado). */
+  const resetStatusFilterOnModalCloseRef = useRef(false);
   /** Oculta el bloque de importación (persiste en sessionStorage hasta cerrar sesión / pestaña). */
   const [importCardCollapsed, setImportCardCollapsed] = useState(false);
   /** Categorías extra solo para el gráfico de demora por región (vacío = usa el filtro de producto del panel). */
@@ -406,17 +445,6 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     });
   }, [filteredForMetrics, clientQuery, statusBucket]);
 
-  const statusModalOrders = useMemo(() => {
-    if (!statusModalOpen) return [];
-    if (statusBucket === "all") return filteredForMetrics;
-    return filteredForMetrics.filter((o) => o.status_bucket === statusBucket);
-  }, [statusModalOpen, statusBucket, filteredForMetrics]);
-
-  const openStatusOrdersModal = useCallback((bucket: typeof statusBucket) => {
-    setStatusBucket(bucket);
-    setStatusModalOpen(true);
-  }, []);
-
   const ordersChartProductOnly = useMemo(
     () => filterDropiOrders(ordersForChartWindow, { region: "all", product, carrier }),
     [ordersForChartWindow, product, carrier],
@@ -540,6 +568,341 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     () => computeDropiMetrics(filteredForMetrics, metaSpend),
     [filteredForMetrics, metaSpend],
   );
+
+  const panelModalOrders = useMemo(() => {
+    if (!panelOrdersModal) return [];
+    if (panelOrdersModal.source === "status") {
+      const { bucket } = panelOrdersModal;
+      if (bucket === "all") return filteredForMetrics;
+      return filteredForMetrics.filter((o) => o.status_bucket === bucket);
+    }
+    const nonCancelled = filteredForMetrics.filter((o) => o.status_bucket !== "cancelled");
+    const delivered = filteredForMetrics.filter((o) => o.status_bucket === "delivered");
+    switch (panelOrdersModal.metric) {
+      case "total_vendido":
+      case "ganancia_estimada":
+      case "aov":
+      case "pct_ganancia_estimada":
+      case "roas_ventas":
+        return nonCancelled;
+      case "ganancia_real":
+      case "ganancia_promedio":
+      case "cpa":
+      case "roas_real":
+      case "pct_ganancia_real":
+      case "inversion_meta":
+        return delivered;
+      case "top_region": {
+        const label = metrics.topRegionEntregados?.label;
+        if (!label) return [];
+        return delivered.filter((o) => {
+          const d = (o.department ?? "").trim();
+          const c = (o.city ?? "").trim();
+          const key = d || c || "Sin región";
+          return key === label;
+        });
+      }
+      case "vista_producto":
+        return filteredForMetrics;
+      default:
+        return [];
+    }
+  }, [panelOrdersModal, filteredForMetrics, metrics]);
+
+  const panelModalTitle = useMemo(() => {
+    if (!panelOrdersModal) return "";
+    if (panelOrdersModal.source === "status") return STATUS_METRIC_MODAL_TITLE[panelOrdersModal.bucket];
+    return FINANCIAL_METRIC_MODAL_TITLE[panelOrdersModal.metric];
+  }, [panelOrdersModal]);
+
+  /** Desglose numérico por métrica (ROAS, CPA, %, etc.) para diferenciar cada ventana emergente. */
+  const panelModalBreakdown = useMemo((): React.ReactNode => {
+    if (!panelOrdersModal || panelOrdersModal.source !== "metric") return null;
+
+    const sale = (o: DropiOrderRow) => o.product_sale_amount ?? 0;
+    const delivered = filteredForMetrics.filter((o) => o.status_bucket === "delivered");
+    const nonCancelled = filteredForMetrics.filter((o) => o.status_bucket !== "cancelled");
+    const entN = delivered.length;
+    const nonCN = nonCancelled.length;
+    const ventasEnt = delivered.reduce((s, o) => s + sale(o), 0);
+    const ventasNC = nonCancelled.reduce((s, o) => s + sale(o), 0);
+    const inv = metrics.inversionMeta;
+
+    const BreakRow = ({
+      label,
+      value,
+      hint,
+    }: {
+      label: string;
+      value: string;
+      hint?: string;
+    }) => (
+      <div className="flex flex-col gap-0.5 border-b border-border/50 py-2.5 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
+          <span className="text-sm text-muted-foreground">{label}</span>
+          {hint ? <p className="text-xs text-muted-foreground/85 mt-0.5 leading-snug">{hint}</p> : null}
+        </div>
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground sm:text-right">{value}</span>
+      </div>
+    );
+
+    const ResultBanner = ({ label, result, formula }: { label: string; result: string; formula: string }) => (
+      <div className="mt-3 rounded-lg border border-primary/25 bg-primary/[0.08] px-3 py-2.5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <span className="text-sm font-medium text-foreground">{label}</span>
+          <span className="text-lg font-bold tabular-nums text-primary">{result}</span>
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed font-mono break-all">{formula}</p>
+      </div>
+    );
+
+    const warn = (msg: string) => (
+      <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.12] px-4 py-3 text-sm text-amber-100 leading-relaxed">
+        {msg}
+      </div>
+    );
+
+    switch (panelOrdersModal.metric) {
+      case "roas_ventas": {
+        if (inv <= 0) return warn("Ingresa y guarda un monto de inversión Meta mayor a cero. ROAS ventas = total vendido ÷ ese gasto.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">ROAS ventas</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Indica cuántas veces se recupera el gasto en ads con el volumen vendido (sin cancelados).</p>
+            <BreakRow label="Numerador · total vendido" value={formatMoney(metrics.totalVendido)} hint={`Suma de “valor venta” en ${nonCN} pedido(s) no cancelado(s)`} />
+            <BreakRow label="Denominador · inversión Meta" value={formatMoney(inv)} hint="Gasto en anuncios manual del rango" />
+            <ResultBanner
+              label="Resultado"
+              result={formatRoas(metrics.roasVentas)}
+              formula={`${formatMoney(metrics.totalVendido)} ÷ ${formatMoney(inv)} = ${formatRoas(metrics.roasVentas)}`}
+            />
+          </div>
+        );
+      }
+      case "roas_real": {
+        if (inv <= 0) return warn("Sin inversión Meta no hay ROAS real. Es ganancia real (solo entregados) ÷ gasto en ads.");
+        if (entN === 0) return warn("No hay entregados en el filtro: la ganancia real es 0 y el ROAS real no aplica.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">ROAS real</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Relaciona la ganancia que ya materializaste (entregados) con el gasto en Meta.</p>
+            <BreakRow label="Numerador · ganancia real" value={formatMoney(metrics.gananciaReal)} hint={`Suma de “ganancia” del Excel en ${entN} entregado(s)`} />
+            <BreakRow label="Denominador · inversión Meta" value={formatMoney(inv)} />
+            <ResultBanner
+              label="Resultado"
+              result={formatRoas(metrics.roasReal)}
+              formula={`${formatMoney(metrics.gananciaReal)} ÷ ${formatMoney(inv)} = ${formatRoas(metrics.roasReal)}`}
+            />
+          </div>
+        );
+      }
+      case "cpa": {
+        if (inv <= 0) return warn("CPA = inversión Meta ÷ pedidos entregados. Añade el gasto en ads.");
+        if (entN === 0) return warn("No hay entregados: no se puede repartir el gasto por pedido.");
+        const cpa = metrics.cpa;
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">CPA (coste por pedido entregado)</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Cuánto te costó en ads cada entrega del periodo (en promedio).</p>
+            <BreakRow label="Dividendo · inversión Meta" value={formatMoney(inv)} />
+            <BreakRow label="Divisor · entregados" value={String(entN)} hint="Pedidos con estado entregado en el filtro" />
+            <ResultBanner
+              label="Resultado"
+              result={cpa != null ? formatMoney(cpa) : "—"}
+              formula={cpa != null ? `${formatMoney(inv)} ÷ ${entN} = ${formatMoney(cpa)}` : "—"}
+            />
+          </div>
+        );
+      }
+      case "aov": {
+        if (nonCN === 0) return warn("No hay pedidos no cancelados: el ticket promedio no aplica.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">AOV (ticket promedio)</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Venta media por pedido que cuenta en “total vendido”.</p>
+            <BreakRow label="Total vendido" value={formatMoney(metrics.totalVendido)} />
+            <BreakRow label="Pedidos (no cancelados)" value={String(nonCN)} />
+            <ResultBanner
+              label="Resultado"
+              result={formatMoney(metrics.aov)}
+              formula={`${formatMoney(metrics.totalVendido)} ÷ ${nonCN} = ${formatMoney(metrics.aov)}`}
+            />
+          </div>
+        );
+      }
+      case "ganancia_promedio": {
+        if (entN === 0) return warn("Sin entregados no hay promedio de ganancia por entregado.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Ganancia promedio por entregado</p>
+            <BreakRow label="Ganancia real (suma)" value={formatMoney(metrics.gananciaReal)} />
+            <BreakRow label="Cantidad de entregados" value={String(entN)} />
+            <ResultBanner
+              label="Resultado"
+              result={formatMoney(metrics.gananciaPromedioEntregado)}
+              formula={`${formatMoney(metrics.gananciaReal)} ÷ ${entN} = ${formatMoney(metrics.gananciaPromedioEntregado)}`}
+            />
+          </div>
+        );
+      }
+      case "pct_ganancia_real": {
+        if (entN === 0 || ventasEnt <= 0) return warn("Hacen falta entregados con venta mayor que cero para este porcentaje.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">% Ganancia real</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Ganancia bruta respecto al dinero facturado solo en entregados.</p>
+            <BreakRow label="Ganancia real" value={formatMoney(metrics.gananciaReal)} />
+            <BreakRow label="Ventas (solo entregados)" value={formatMoney(ventasEnt)} hint={`Suma de venta en ${entN} entregado(s)`} />
+            <ResultBanner
+              label="Resultado"
+              result={`${metrics.pctGananciaReal}%`}
+              formula={`(${formatMoney(metrics.gananciaReal)} ÷ ${formatMoney(ventasEnt)}) × 100 ≈ ${metrics.pctGananciaReal}%`}
+            />
+          </div>
+        );
+      }
+      case "pct_ganancia_estimada": {
+        if (nonCN === 0 || ventasNC <= 0) return warn("Hacen falta pedidos no cancelados con venta para este porcentaje.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">% Ganancia estimada</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Ganancia bruta sobre ventas de todos los pedidos que no están cancelados.</p>
+            <BreakRow label="Ganancia estimada (suma)" value={formatMoney(metrics.gananciaEstimada)} />
+            <BreakRow label="Ventas (no cancelados)" value={formatMoney(ventasNC)} hint={`${nonCN} pedido(s)`} />
+            <ResultBanner
+              label="Resultado"
+              result={`${metrics.pctGananciaEstimada}%`}
+              formula={`(${formatMoney(metrics.gananciaEstimada)} ÷ ${formatMoney(ventasNC)}) × 100 ≈ ${metrics.pctGananciaEstimada}%`}
+            />
+          </div>
+        );
+      }
+      case "total_vendido": {
+        if (nonCN === 0) return warn("No hay pedidos no cancelados en el filtro.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Total vendido</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Suma aritmética del valor de compra en productos; excluye cancelados.</p>
+            <BreakRow label="Pedidos incluidos" value={String(nonCN)} hint="Estados distintos de cancelado" />
+            <BreakRow label="Suma de ventas" value={formatMoney(metrics.totalVendido)} hint="Una fila por pedido en la lista inferior" />
+          </div>
+        );
+      }
+      case "ganancia_real": {
+        if (entN === 0) return warn("No hay entregados: la ganancia real es 0.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Ganancia real</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Suma de la columna ganancia solo donde el estado es entregado.</p>
+            <BreakRow label="Entregados" value={String(entN)} />
+            <BreakRow label="Suma de ganancias" value={formatMoney(metrics.gananciaReal)} />
+          </div>
+        );
+      }
+      case "ganancia_estimada": {
+        if (nonCN === 0) return warn("No hay pedidos no cancelados.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Ganancia estimada</p>
+            <p className="text-[11px] text-muted-foreground mb-2">Suma de ganancia en tránsito, novedad, devolución, pendiente y entregado — no cancelados.</p>
+            <BreakRow label="Pedidos incluidos" value={String(nonCN)} />
+            <BreakRow label="Suma de ganancias" value={formatMoney(metrics.gananciaEstimada)} />
+          </div>
+        );
+      }
+      case "inversion_meta": {
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Inversión Meta</p>
+            <p className="text-[11px] text-muted-foreground mb-2">No sale del Excel: lo ingresas arriba y lo guardamos por rango de fechas.</p>
+            <BreakRow label="Monto considerado" value={formatMoney(inv)} hint="Usado como denominador en ROAS y como dividendo en CPA" />
+            <BreakRow label="Entregados en el corte (referencia)" value={String(entN)} hint="Base de pedidos para CPA = inversión ÷ entregados" />
+          </div>
+        );
+      }
+      case "top_region": {
+        const top = metrics.topRegionEntregados;
+        if (!top) return warn("No hay entregados en el filtro actual.");
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Top región (entregados)</p>
+            <BreakRow label="Región" value={top.label} />
+            <BreakRow label="Entregados en esa región" value={String(top.count)} hint="Misma lógica que el mapa: departamento o ciudad del Excel" />
+          </div>
+        );
+      }
+      case "vista_producto": {
+        return (
+          <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-0.5">Vista por producto</p>
+            <BreakRow
+              label="Filtro de categoría"
+              value={product === "all" ? "Todos" : (productFilterOptions.find((o) => o.value === product)?.label ?? product)}
+            />
+            <BreakRow label="Pedidos listados abajo" value={String(filteredForMetrics.length)} hint="Respetan también región y logística del panel" />
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
+  }, [panelOrdersModal, filteredForMetrics, metrics, product, productFilterOptions]);
+
+  const panelModalListCaption = useMemo(() => {
+    if (!panelOrdersModal) return "";
+    const n = panelModalOrders.length;
+    if (panelOrdersModal.source === "status") {
+      if (n === 0) return "No hay guías en este estado con los filtros actuales.";
+      return `Guías en “${STATUS_METRIC_MODAL_TITLE[panelOrdersModal.bucket]}” (${n}) · desplázate para ver el detalle`;
+    }
+    switch (panelOrdersModal.metric) {
+      case "total_vendido":
+        return `Cada pedido suma su venta al total (${n} no cancelado(s))`;
+      case "ganancia_real":
+        return `Entregados que componen la ganancia real (${n})`;
+      case "ganancia_estimada":
+        return `No cancelados: suma de sus ganancias (${n})`;
+      case "ganancia_promedio":
+        return `Mismo conjunto que la ganancia real: entregados (${n})`;
+      case "inversion_meta":
+        return `Referencia operativa: entregados del corte (${n}) — útiles para contextualizar el CPA`;
+      case "roas_ventas":
+        return `Pedidos no cancelados: sus ventas suman el numerador del ROAS (${n})`;
+      case "roas_real":
+        return `Entregados: sus ganancias suman el numerador del ROAS real (${n})`;
+      case "cpa":
+        return `Entregados usados como divisor del CPA (${n})`;
+      case "aov":
+        return `Pedidos no cancelados del denominador del ticket promedio (${n})`;
+      case "pct_ganancia_real":
+        return `Entregados con venta y ganancia en el Excel (${n})`;
+      case "pct_ganancia_estimada":
+        return `No cancelados incluidos en el % (${n})`;
+      case "top_region":
+        return n === 0 ? "Sin entregados en la región líder con el filtro actual." : `Entregados solo en la región líder (${n})`;
+      case "vista_producto":
+        return `Pedidos que aplican al filtro actual de categoría (${n})`;
+      default:
+        return n === 0 ? "Sin pedidos." : `Pedidos relacionados (${n})`;
+    }
+  }, [panelOrdersModal, panelModalOrders.length]);
+
+  const openStatusOrdersModal = useCallback((bucket: OrderStatusBucket) => {
+    resetStatusFilterOnModalCloseRef.current = true;
+    setStatusBucket(bucket);
+    setPanelOrdersModal({ source: "status", bucket });
+  }, []);
+
+  const openMetricOrdersModal = useCallback((metric: FinancialMetricKey) => {
+    resetStatusFilterOnModalCloseRef.current = false;
+    setPanelOrdersModal({ source: "metric", metric });
+  }, []);
+
+  const closePanelOrdersModal = useCallback(() => {
+    if (resetStatusFilterOnModalCloseRef.current) setStatusBucket("all");
+    resetStatusFilterOnModalCloseRef.current = false;
+    setPanelOrdersModal(null);
+  }, []);
 
   const renderOrderCard = useCallback(
     (o: DropiOrderRow) => {
@@ -1098,15 +1461,61 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
 
       {/* ── Métricas principales ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <MetricCard title="Total vendido" value={formatMoney(metrics.totalVendido)} icon={DollarSign} color="primary" description="Suma valor compra productos, excl. cancelados / anulados" loading={loading} />
-        <MetricCard title="Ganancia real" value={formatMoney(metrics.gananciaReal)} icon={TrendingUp} color="success" description="Suma GANANCIA solo pedidos entregados" loading={loading} />
-        <MetricCard title="Ganancia estimada" value={formatMoney(metrics.gananciaEstimada)} icon={TrendingUp} color="warning" description="Suma GANANCIA en todos los no cancelados" loading={loading} />
-        <MetricCard title="Ganancia promedio" value={formatMoney(metrics.gananciaPromedioEntregado)} icon={Target} color="primary" description="Por pedido entregado" loading={loading} />
-        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/95 p-5 shadow-elev-1 backdrop-blur-sm transition-all duration-base ease-standard hover:border-border/80 hover:shadow-elev-2 hover:-translate-y-px">
+        <MetricCard
+          title="Total vendido"
+          value={formatMoney(metrics.totalVendido)}
+          icon={DollarSign}
+          color="primary"
+          description="Suma valor compra productos, excl. cancelados / anulados"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("total_vendido")}
+          titleAttr="Ver pedidos que suman esta métrica"
+        />
+        <MetricCard
+          title="Ganancia real"
+          value={formatMoney(metrics.gananciaReal)}
+          icon={TrendingUp}
+          color="success"
+          description="Suma GANANCIA solo pedidos entregados"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("ganancia_real")}
+          titleAttr="Ver entregados y detalle"
+        />
+        <MetricCard
+          title="Ganancia estimada"
+          value={formatMoney(metrics.gananciaEstimada)}
+          icon={TrendingUp}
+          color="warning"
+          description="Suma GANANCIA en todos los no cancelados"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("ganancia_estimada")}
+          titleAttr="Ver pedidos no cancelados"
+        />
+        <MetricCard
+          title="Ganancia promedio"
+          value={formatMoney(metrics.gananciaPromedioEntregado)}
+          icon={Target}
+          color="primary"
+          description="Por pedido entregado"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("ganancia_promedio")}
+          titleAttr="Ver entregados (base del promedio)"
+        />
+        <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card/95 p-5 shadow-elev-1 backdrop-blur-sm transition-all duration-base ease-standard">
           <div className="flex items-start justify-between gap-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
               <Package className="size-[18px]" strokeWidth={2} />
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 text-xs text-muted-foreground hover:text-foreground"
+              disabled={loading}
+              onClick={() => openMetricOrdersModal("vista_producto")}
+            >
+              Ver pedidos
+            </Button>
           </div>
           <div className="mt-5 space-y-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vista por producto</p>
@@ -1137,11 +1546,56 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard title="Inversión Meta" value={formatMoney(metrics.inversionMeta)} icon={Megaphone} color="warning" description="Gasto en ads (manual)" loading={loading} />
-        <MetricCard title="ROAS ventas" value={formatRoas(metrics.roasVentas)} icon={DollarSign} color="info" description="Total vendido / ads" loading={loading} />
-        <MetricCard title="ROAS real" value={formatRoas(metrics.roasReal)} icon={TrendingUp} color="success" description="Ganancia real / ads" loading={loading} />
-        <MetricCard title="CPA" value={metrics.cpa != null ? formatMoney(metrics.cpa) : "—"} icon={Target} color="primary" description="Ads / pedidos entregados" loading={loading} />
-        <MetricCard title="AOV" value={formatMoney(metrics.aov)} icon={Package} color="primary" description="Ticket promedio (total vendido / no cancelados)" loading={loading} />
+        <MetricCard
+          title="Inversión Meta"
+          value={formatMoney(metrics.inversionMeta)}
+          icon={Megaphone}
+          color="warning"
+          description="Gasto en ads (manual)"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("inversion_meta")}
+          titleAttr="Ver contexto y pedidos entregados (base CPA)"
+        />
+        <MetricCard
+          title="ROAS ventas"
+          value={formatRoas(metrics.roasVentas)}
+          icon={DollarSign}
+          color="info"
+          description="Total vendido / ads"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("roas_ventas")}
+          titleAttr="Ver pedidos que entran en total vendido"
+        />
+        <MetricCard
+          title="ROAS real"
+          value={formatRoas(metrics.roasReal)}
+          icon={TrendingUp}
+          color="success"
+          description="Ganancia real / ads"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("roas_real")}
+          titleAttr="Ver entregados (base ganancia real)"
+        />
+        <MetricCard
+          title="CPA"
+          value={metrics.cpa != null ? formatMoney(metrics.cpa) : "—"}
+          icon={Target}
+          color="primary"
+          description="Ads / pedidos entregados"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("cpa")}
+          titleAttr="Ver pedidos entregados del cálculo"
+        />
+        <MetricCard
+          title="AOV"
+          value={formatMoney(metrics.aov)}
+          icon={Package}
+          color="primary"
+          description="Ticket promedio (total vendido / no cancelados)"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("aov")}
+          titleAttr="Ver pedidos no cancelados"
+        />
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -1233,36 +1687,41 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         />
       </div>
 
-      <Dialog
-        open={statusModalOpen}
-        onOpenChange={(open) => {
-          setStatusModalOpen(open);
-          if (!open) setStatusBucket("all");
-        }}
-      >
+      <Dialog open={panelOrdersModal !== null} onOpenChange={(open) => { if (!open) closePanelOrdersModal(); }}>
         <DialogContent className="flex max-h-[min(90vh,900px)] min-h-0 flex-col gap-4 overflow-hidden p-6 sm:max-w-2xl">
           <DialogHeader className="shrink-0 space-y-2 text-left">
-            <DialogTitle>{STATUS_METRIC_MODAL_TITLE[statusBucket]}</DialogTitle>
-            <DialogDescription>
-              {statusModalOrders.length === 0
-                ? "No hay guías en este estado con los filtros actuales."
-                : `${statusModalOrders.length} guía${statusModalOrders.length === 1 ? "" : "s"} en este grupo (mismo rango de fechas y filtros de región, producto y logística). Desplázate para ver todas.`}
-            </DialogDescription>
+            <DialogTitle>{panelModalTitle}</DialogTitle>
+            {panelOrdersModal?.source === "status" ? (
+              <DialogDescription className="text-left text-sm text-muted-foreground">
+                {panelModalOrders.length === 0
+                  ? "No hay guías en este estado con los filtros actuales."
+                  : "Mismo rango de fechas y filtros de región, producto y logística. Desplázate para ver cada guía."}
+              </DialogDescription>
+            ) : (
+              <DialogDescription className="sr-only">
+                Desglose de la métrica y listado de pedidos relacionados.
+              </DialogDescription>
+            )}
           </DialogHeader>
+          {panelModalBreakdown}
+          <div className="shrink-0 space-y-1 border-b border-border/40 pb-2">
+            <p className="text-sm font-medium text-foreground leading-snug">{panelModalListCaption}</p>
+            <p className="text-[11px] text-muted-foreground">Rango de fechas del panel y filtros activos aplican a todos los números.</p>
+          </div>
           <div
             className="min-h-0 max-h-[min(calc(90vh-12rem),720px)] flex-1 overflow-y-auto overflow-x-hidden overscroll-y-contain pr-1 [-webkit-overflow-scrolling:touch] scroll-smooth"
             role="region"
-            aria-label="Listado de pedidos en este estado"
+            aria-label="Listado de pedidos"
             tabIndex={0}
           >
             <div className="space-y-3 pb-1">
-              {statusModalOrders.map((o) => (
+              {panelModalOrders.map((o) => (
                 <Fragment key={o.id}>{renderOrderCard(o)}</Fragment>
               ))}
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border/40 pt-4 mt-0 sm:justify-end">
-            <Button type="button" variant="secondary" onClick={() => setStatusModalOpen(false)}>
+            <Button type="button" variant="secondary" onClick={closePanelOrdersModal}>
               Cerrar
             </Button>
           </DialogFooter>
@@ -1270,8 +1729,26 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
       </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard title="% Ganancia real" value={`${metrics.pctGananciaReal}%`} icon={Percent} color="success" description="Ganancia bruta sobre ventas de pedidos entregados" loading={loading} />
-        <MetricCard title="% Ganancia estimada" value={`${metrics.pctGananciaEstimada}%`} icon={Percent} color="warning" description="Ganancia bruta sobre ventas de pedidos no cancelados" loading={loading} />
+        <MetricCard
+          title="% Ganancia real"
+          value={`${metrics.pctGananciaReal}%`}
+          icon={Percent}
+          color="success"
+          description="Ganancia bruta sobre ventas de pedidos entregados"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("pct_ganancia_real")}
+          titleAttr="Ver entregados"
+        />
+        <MetricCard
+          title="% Ganancia estimada"
+          value={`${metrics.pctGananciaEstimada}%`}
+          icon={Percent}
+          color="warning"
+          description="Ganancia bruta sobre ventas de pedidos no cancelados"
+          loading={loading}
+          onClick={() => openMetricOrdersModal("pct_ganancia_estimada")}
+          titleAttr="Ver no cancelados"
+        />
         <MetricCard
           title="Top región entregados"
           value={metrics.topRegionEntregados?.label ?? "—"}
@@ -1279,6 +1756,8 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
           color="info"
           description={metrics.topRegionEntregados ? `${metrics.topRegionEntregados.count} entregados` : "Sin entregados en el filtro"}
           loading={loading}
+          onClick={() => openMetricOrdersModal("top_region")}
+          titleAttr="Ver entregados de la región líder"
         />
       </div>
 

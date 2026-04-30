@@ -156,7 +156,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="flex flex-wrap gap-3 mt-6">
-              <Button variant="outline" onClick={() => navigate("/profile")}>
+              <Button variant="outline" onClick={() => navigate("/profile?edit=1")}>
                 <User className="w-4 h-4 mr-2" />
                 Editar perfil
               </Button>
