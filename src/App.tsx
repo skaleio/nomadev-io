@@ -1,73 +1,72 @@
 import { lazy, Suspense } from "react";
 import { HeroUIProvider } from "@heroui/react";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { CustomCursor } from "@/components/effects/custom-cursor";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./contexts/AuthContext";
-import { WebSocketProvider } from "./contexts/WebSocketContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { NotificationsProvider } from "./contexts/NotificationsContext";
-import ProtectedRoute from "./components/ProtectedRoute";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
+import { ThemeProvider } from "@/theme/ThemeContext";
+import { NotificationsProvider } from "@/features/notifications/context/NotificationsContext";
+import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 
 // MVP — carga inmediata (auth + dashboard + CRM + pedidos Dropi + ajustes)
-import LandingPage from "./pages/LandingPage";
-import Dashboard from "./pages/Dashboard";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import { EmailVerificationPage } from "./pages/EmailVerificationPage";
-import AuthSuccessPage from "./pages/AuthSuccessPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import OrdersPage from "./pages/OrdersPage";
-import CRMPage from "./pages/CRMPage";
-import DropiPage from "./pages/DropiPage";
-import DropiConnectPage from "./pages/DropiConnectPage";
-import ProfilePage from "./pages/ProfilePage";
-import SettingsPage from "./pages/SettingsPage";
-import NotFound from "./pages/NotFound";
+import LandingPage from "@/pages/LandingPage";
+import Dashboard from "@/features/dashboard/pages/Dashboard";
+import LoginPage from "@/features/auth/pages/LoginPage";
+import RegisterPage from "@/features/auth/pages/RegisterPage";
+import { EmailVerificationPage } from "@/features/auth/pages/EmailVerificationPage";
+import AuthSuccessPage from "@/features/auth/pages/AuthSuccessPage";
+import OnboardingPage from "@/features/onboarding/pages/OnboardingPage";
+import OrdersPage from "@/features/orders/pages/OrdersPage";
+import CRMPage from "@/features/crm/pages/CRMPage";
+import DropiPage from "@/features/dropi/pages/DropiPage";
+import DropiConnectPage from "@/features/dropi/pages/DropiConnectPage";
+import ProfilePage from "@/features/profile/pages/ProfilePage";
+import SettingsPage from "@/features/settings/pages/SettingsPage";
+import NotFound from "@/pages/NotFound";
 
 // Post-MVP — lazy
-const WorkflowExample = lazy(() =>
-  import("./components/workflow/WorkflowExample").then((m) => ({ default: m.WorkflowExample })),
+const WorkflowExamplePage = lazy(() =>
+  import("@/features/workflow/components/WorkflowExample").then((m) => ({ default: m.WorkflowExample })),
 );
-const ValidationPage = lazy(() => import("./pages/ValidationPage"));
-const ChatPage = lazy(() => import("./pages/ChatPage"));
-const LeadsPage = lazy(() => import("./pages/LeadsPage"));
-const ShopifyPage = lazy(() => import("./pages/ShopifyPage"));
-const ShopifyConnectPage = lazy(() => import("./pages/ShopifyConnectPage"));
-const BillingPage = lazy(() => import("./pages/BillingPage"));
-const KeyboardShortcutsPage = lazy(() => import("./pages/KeyboardShortcutsPage"));
-const TeamIndexPage = lazy(() => import("./pages/TeamIndexPage"));
-const TeamNewPage = lazy(() => import("./pages/TeamNewPage"));
-const TeamInvitePage = lazy(() => import("./pages/TeamInvitePage"));
-const OrderValidationPage = lazy(() => import("./pages/OrderValidationPage"));
-const TrackingPage = lazy(() => import("./pages/TrackingPage"));
-const StudioIAPage = lazy(() => import("./pages/StudioIAPage"));
-const ProductImageGeneratorPage = lazy(() => import("./pages/ProductImageGeneratorPage"));
-const CopywritingPage = lazy(() => import("./pages/CopywritingPage"));
-const LogoGeneratorPage = lazy(() => import("./pages/LogoGeneratorPage"));
-const AgentBuilderPage = lazy(() => import("./pages/AgentBuilderPage"));
-const AgentHubPage = lazy(() => import("./pages/AgentHubPage"));
-const WhatsAppIntegrationPage = lazy(() => import("./pages/WhatsAppIntegrationPage"));
-const PriceOptimizerPage = lazy(() => import("./pages/PriceOptimizerPage"));
-const BrandIdentityPage = lazy(() => import("./pages/BrandIdentityPage"));
-const WebsiteBuilderPage = lazy(() => import("./pages/WebsiteBuilderPage"));
+const ValidationPage = lazy(() => import("@/features/orders/pages/ValidationPage"));
+const ChatPage = lazy(() => import("@/features/chat/pages/ChatPage"));
+const LeadsPage = lazy(() => import("@/features/crm/pages/LeadsPage"));
+const ShopifyPage = lazy(() => import("@/features/shopify/pages/ShopifyPage"));
+const ShopifyConnectPage = lazy(() => import("@/features/shopify/pages/ShopifyConnectPage"));
+const BillingPage = lazy(() => import("@/features/billing/pages/BillingPage"));
+const KeyboardShortcutsPage = lazy(() => import("@/pages/KeyboardShortcutsPage"));
+const TeamIndexPage = lazy(() => import("@/features/team/pages/TeamIndexPage"));
+const TeamNewPage = lazy(() => import("@/features/team/pages/TeamNewPage"));
+const TeamInvitePage = lazy(() => import("@/features/team/pages/TeamInvitePage"));
+const OrderValidationPage = lazy(() => import("@/features/orders/pages/OrderValidationPage"));
+const TrackingPage = lazy(() => import("@/features/orders/pages/TrackingPage"));
+const StudioIAPage = lazy(() => import("@/features/studio-ia/pages/StudioIAPage"));
+const ProductImageGeneratorPage = lazy(() => import("@/features/studio-ia/pages/ProductImageGeneratorPage"));
+const CopywritingPage = lazy(() => import("@/features/studio-ia/pages/CopywritingPage"));
+const LogoGeneratorPage = lazy(() => import("@/features/studio-ia/pages/LogoGeneratorPage"));
+const AgentBuilderPage = lazy(() => import("@/features/workflow/pages/AgentBuilderPage"));
+const AgentHubPage = lazy(() => import("@/features/agents/pages/AgentHubPage"));
+const WhatsAppIntegrationPage = lazy(() => import("@/features/whatsapp/pages/WhatsAppIntegrationPage"));
+const PriceOptimizerPage = lazy(() => import("@/features/studio-ia/pages/PriceOptimizerPage"));
+const BrandIdentityPage = lazy(() => import("@/features/studio-ia/pages/BrandIdentityPage"));
+const WebsiteBuilderPage = lazy(() => import("@/features/studio-ia/pages/WebsiteBuilderPage"));
 
 // Demos — lazy (mocks internos)
-const DemoPage = lazy(() => import("./pages/DemoPage"));
-const InteractiveDemo = lazy(() => import("./pages/InteractiveDemo"));
-const ValidationDemo = lazy(() => import("./pages/ValidationDemo"));
-const ShopifyDemo = lazy(() => import("./pages/ShopifyDemo"));
-const ChatDemo = lazy(() => import("./pages/ChatDemo"));
-const OrdersDemo = lazy(() => import("./pages/OrdersDemo"));
-const TrackingDemo = lazy(() => import("./pages/TrackingDemo"));
-const LeadsDemo = lazy(() => import("./pages/LeadsDemo"));
-const SettingsDemo = lazy(() => import("./pages/SettingsDemo"));
-const StudioIADemo = lazy(() => import("./pages/StudioIADemo"));
-const CRMDemo = lazy(() => import("./pages/CRMDemo"));
-const ScheduleDemoPage = lazy(() => import("./pages/ScheduleDemoPage"));
+const DemoPage = lazy(() => import("@/pages/demo/DemoPage"));
+const InteractiveDemo = lazy(() => import("@/pages/demo/InteractiveDemo"));
+const ValidationDemo = lazy(() => import("@/pages/demo/ValidationDemo"));
+const ShopifyDemo = lazy(() => import("@/pages/demo/ShopifyDemo"));
+const ChatDemo = lazy(() => import("@/pages/demo/ChatDemo"));
+const OrdersDemo = lazy(() => import("@/pages/demo/OrdersDemo"));
+const TrackingDemo = lazy(() => import("@/pages/demo/TrackingDemo"));
+const LeadsDemo = lazy(() => import("@/pages/demo/LeadsDemo"));
+const SettingsDemo = lazy(() => import("@/pages/demo/SettingsDemo"));
+const StudioIADemo = lazy(() => import("@/pages/demo/StudioIADemo"));
+const CRMDemo = lazy(() => import("@/pages/demo/CRMDemo"));
+const ScheduleDemoPage = lazy(() => import("@/pages/demo/ScheduleDemoPage"));
 
 const queryClient = new QueryClient();
 
@@ -76,7 +75,6 @@ const queryClient = new QueryClient();
 const AppContent = () => {
   return (
     <>
-      <Toaster />
       <Sonner />
 
       <BrowserRouter>
@@ -84,7 +82,7 @@ const AppContent = () => {
           <Routes>
               {/* Rutas públicas */}
               <Route path="/" element={<LandingPage />} />
-              <Route path="/workflow" element={<WorkflowExample />} />
+              <Route path="/workflow" element={<WorkflowExamplePage />} />
               <Route path="/demo" element={<DemoPage />} />
               <Route path="/interactive-demo" element={<InteractiveDemo />} />
               <Route path="/validation-demo" element={<ValidationDemo />} />

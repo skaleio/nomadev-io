@@ -1,7 +1,9 @@
 # ANÁLISIS DEL CODEBASE — nomadev-io
 
-> Auditoría estructural sin modificación de código. Generada en `main` @ commit `6b23a85`.
+> Auditoría estructural inicial. Generada en `main` @ commit `6b23a85`.
 > Total de archivos fuente en `src/`: **216** · LOC totales en `src/`: **~51.028**.
+>
+> **ESTADO ACTUAL (2026-04-29): Reorganización completada. Ver sección 8 al final.**
 
 ---
 
@@ -419,3 +421,90 @@ src/
 ---
 
 > **STOP** — Fin de Fase 1. No se modificó código. Esperando aprobación para Fase 2 con respuestas a la sección 7.
+
+---
+
+## 8. ESTADO POST-REORGANIZACIÓN (2026-04-29)
+
+Las Fases A-D del plan se ejecutaron. Build Vite ✅, errores TS sin regresión vs baseline (296 → 296).
+
+### 8.1 Estructura final
+
+```
+src/
+├── App.tsx                       # composición de providers + router
+├── main.tsx                      # entrypoint con <ErrorBoundary>
+├── App.css, index.css
+├── components/                   # design-system + globales
+│   ├── ui/                       # shadcn primitives (sin feature-specific)
+│   ├── effects/                  # globe, marquee, custom-cursor, RippleGrid, hero-video-dialog
+│   ├── feedback/                 # loading-logo
+│   ├── animate-ui/               # vendor-like
+│   └── ErrorBoundary.tsx
+├── config/performance.ts
+├── contexts/                     # solo providers globales
+│   └── WebSocketContext.tsx
+├── features/                     # 18 features, cada una autocontenida
+│   ├── agents/{hooks,lib,pages}
+│   ├── auth/{components,context,hooks,pages}
+│   ├── billing/pages
+│   ├── chat/{components,hooks,lib,pages}
+│   ├── command-palette/CommandPalette.tsx
+│   ├── crm/{hooks,lib,pages}
+│   ├── dashboard/{components,pages}
+│   ├── dropi/{components,hooks,lib,pages}
+│   ├── notifications/{components,context,hooks,lib,ui}
+│   ├── onboarding/{components,hooks,lib,pages}
+│   ├── orders/pages
+│   ├── profile/pages
+│   ├── settings/{components,hooks,lib,pages}
+│   ├── shopify/{components,hooks,lib,pages}
+│   ├── studio-ia/{lib,pages}
+│   ├── team/pages
+│   ├── whatsapp/{lib,pages}
+│   └── workflow/{components,hooks,lib,pages,store,types}
+├── hooks/                        # transversales (use-mobile, useDocumentTitle, usePerformance, use-controlled-state, useWebSocket)
+├── lib/                          # transversales
+│   ├── supabase/{client,types}.ts
+│   ├── security/                 # input-validator, mfa, rate-limiter, security-headers, security-monitor
+│   ├── react/get-strict-context.tsx
+│   ├── services/ai-service.ts    # transversal IA (no específico de feature)
+│   ├── utils.ts, config.ts, error-handler.ts, lockedNavPaths.ts, n8n-webhook.ts, regionChartColors.ts
+├── pages/                        # solo páginas globales
+│   ├── LandingPage.tsx, NotFound.tsx, KeyboardShortcutsPage.tsx
+│   └── demo/                     # 13 demos agrupadas
+└── theme/ThemeContext.tsx
+```
+
+### 8.2 Cambios aplicados
+
+**Limpieza de dead code (pre-existente, sin tocar)**: en commit `108f31c` se borraron archivos no tracked: SimpleAuthContext, Silk, DebugAuth, EmailVerificationModal, examples/, shopify-backend/, lib/api, lib/backend-api, lib/shopify-api, lib/shopify-simple, lib/shopify-config, lib/ShopifyAPIClient, lib/ShopifyMetricsService, hooks/useShopifyData, pages/SecurityDashboard, pages/WhatsAppChatPage, ui/use-toast (shim), ui/pointer, ui/orbiting-circles, ui/ConfigStatusBanner, bun.lockb.
+
+**Edge functions Supabase saneadas** (auditoría con MCP):
+- 11 funciones huérfanas en filesystem (sin deploy real) borradas: `api-keys`, `batch-message-worker`, `easydrop-integration`, `n8n-webhook`, `public-api`, `shopify-analytics`, `shopify-connect`, `shopify-oauth-init`, `shopify-validate`, `whatsapp-send`, `whatsapp-webhook` (v1).
+- Quedan 13 funciones activas + `_shared` + 4 archivos config — alineado con producción.
+
+**Reorganización por features**: 18 features creadas, cada una con `{components,hooks,lib,pages,context,...}` según necesidad. Todos los imports actualizados con sed masivo (cero residuos viejos verificados con grep).
+
+**Toast system unificado**: Se eliminó `<Toaster>` shadcn de App.tsx (solo Sonner queda montado). Borrados `src/components/ui/toaster.tsx`, `toast.tsx`, `src/hooks/use-toast.ts`. ShopifyPage migrado de `useToast()` a `toast` de Sonner.
+
+**ShopifyPage limpiado**: removidos handlers `handleConnectManually` (helper que arrojaba `Error("tabla shops eliminada")`) y `handleTestDirect` (helper de debug). Borrados `src/lib/connectShopifyManually.ts` y `src/lib/testShopifyDirect.ts`. Los botones nunca se renderizaban — UX recta sin cambios visibles.
+
+### 8.3 Bugs documentados (no rediseñados — son decisiones de producto)
+
+Detectados durante la auditoría con MCP, pero NO corregidos en este refactor (cambios de superficie):
+
+1. **Conexión Shopify rota en producción**:
+   - `src/features/shopify/components/ShopifyConnect.tsx:67` invoca `shopify-oauth-init` — esa edge function NO existe en Supabase. La activa es `shopify-oauth-start`.
+   - `src/features/shopify/lib/shopifyMetrics.ts:91` invoca `shopify-analytics` — tampoco existe. Las activas son `shopify-get-metrics` y `shopify-metrics-advanced`.
+2. **Tablas Shopify legacy**: comentarios in-code referencian tabla `shops` que ya no existe. Las tablas activas son `shopify_connections`, `shopify_oauth_states`, `shopify_activity_log`, `shopify_webhooks`.
+
+### 8.4 Pendientes de futuras fases (decisión del usuario)
+
+1. **3 componentes notification** (`notification-banner`, `simple-notification`, `consolidated-notification`): los 3 viven en `src/features/notifications/ui/` y se importan en `DashboardLayout`. Necesita auditoría runtime para decidir consolidación.
+2. **Re-enchufado del flujo Shopify**: invokes a edge functions inexistentes deben actualizarse a las nombres reales en Supabase, o el flujo entero rediseñado.
+3. **Archivos gigantes**: `DropiOrdersPanel.tsx` (1837 LOC), `LandingPage.tsx` (1777 LOC), `AgentBuilderPage.tsx` (1284 LOC). Candidatos a partir en sub-componentes.
+4. **TS errors pre-existentes**: 296 errores baseline siguen ahí. La mayoría son tipos de Supabase con queries que apuntan a columnas que no existen. Auditar tras el saneo de DB.
+5. **`bun.lockb` ya borrado** — npm es ahora el package manager canónico.
+6. **`test0/` y `test1/`**: scaffolds Shopify CLI, sin código de SPA. Quedan donde están (no afectan build), candidatos a archivar fuera del repo.
+

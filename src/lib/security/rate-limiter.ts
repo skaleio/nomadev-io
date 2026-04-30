@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase/client';
 
 export interface RateLimitConfig {
   windowMs: number; // Ventana de tiempo en ms
