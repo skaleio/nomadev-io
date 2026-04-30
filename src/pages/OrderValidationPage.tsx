@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { ScrollArea } from '../components/ui/scroll-area';
-import { Separator } from '../components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { 
   Package, 
   CheckCircle, 
@@ -15,8 +15,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { supabase } from '../integrations/supabase/client';
-import { DashboardLayout } from '../components/dashboard/DashboardLayout';
-import { LoadingScreen } from '../components/ui/loading-logo';
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { LoadingScreen } from '@/components/feedback/loading-logo';
 
 interface OrderValidation {
   id: string;

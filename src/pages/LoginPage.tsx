@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, ArrowLeft } from 'lucide-react';
-import RippleGrid from '@/components/RippleGrid';
+import RippleGrid from '@/components/effects/RippleGrid';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');

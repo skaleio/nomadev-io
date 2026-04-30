@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, ExternalLink, CheckCircle, Sparkles, ArrowLeft, RefreshCw } from 'lucide-react';
-import RippleGrid from '@/components/RippleGrid';
+import RippleGrid from '@/components/effects/RippleGrid';
 
 export const EmailVerificationPage = () => {
   const navigate = useNavigate();

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { NewDashboardLayout } from "@/components/dashboard/NewDashboardLayout";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { 
   Bot, 
   ArrowLeft,
@@ -361,7 +361,7 @@ export default function AgentHubPage() {
   };
 
   return (
-    <NewDashboardLayout>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -844,6 +844,6 @@ export default function AgentHubPage() {
         </div>
       )}
       </div>
-    </NewDashboardLayout>
+    </DashboardLayout>
   );
 }

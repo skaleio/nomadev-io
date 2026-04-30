@@ -1,8 +1,9 @@
+import { lazy, Suspense } from "react";
 import { HeroUIProvider } from "@heroui/react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { CustomCursor } from "@/components/ui/custom-cursor";
+import { CustomCursor } from "@/components/effects/custom-cursor";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -10,55 +11,63 @@ import { WebSocketProvider } from "./contexts/WebSocketContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { NotificationsProvider } from "./contexts/NotificationsContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+
+// MVP — carga inmediata (auth + dashboard + CRM + pedidos Dropi + ajustes)
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
-import { WorkflowExample } from "./components/workflow/WorkflowExample";
 import RegisterPage from "./pages/RegisterPage";
-import ValidationPage from "./pages/ValidationPage";
-import ChatPage from "./pages/ChatPage";
-import LeadsPage from "./pages/LeadsPage";
-import ShopifyPage from "./pages/ShopifyPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
-import BillingPage from "./pages/BillingPage";
-import KeyboardShortcutsPage from "./pages/KeyboardShortcutsPage";
-import TeamIndexPage from "./pages/TeamIndexPage";
-import TeamNewPage from "./pages/TeamNewPage";
-import TeamInvitePage from "./pages/TeamInvitePage";
-import ShopifyConnectPage from "./pages/ShopifyConnectPage";
+import { EmailVerificationPage } from "./pages/EmailVerificationPage";
+import AuthSuccessPage from "./pages/AuthSuccessPage";
+import OnboardingPage from "./pages/OnboardingPage";
+import OrdersPage from "./pages/OrdersPage";
+import CRMPage from "./pages/CRMPage";
 import DropiPage from "./pages/DropiPage";
 import DropiConnectPage from "./pages/DropiConnectPage";
-import AuthSuccessPage from "./pages/AuthSuccessPage";
-import OrderValidationPage from "./pages/OrderValidationPage";
-import OrdersPage from "./pages/OrdersPage";
-import TrackingPage from "./pages/TrackingPage";
-import CRMPage from "./pages/CRMPage";
-import StudioIAPage from "./pages/StudioIAPage";
-import ProductImageGeneratorPage from "./pages/ProductImageGeneratorPage";
-import CopywritingPage from "./pages/CopywritingPage";
-import LogoGeneratorPage from "./pages/LogoGeneratorPage";
-import AgentBuilderPage from "./pages/AgentBuilderPage";
-import AgentHubPage from "./pages/AgentHubPage";
-import WhatsAppIntegrationPage from "./pages/WhatsAppIntegrationPage";
-import PriceOptimizerPage from "./pages/PriceOptimizerPage";
-import BrandIdentityPage from "./pages/BrandIdentityPage";
-import WebsiteBuilderPage from "./pages/WebsiteBuilderPage";
-import DemoPage from "./pages/DemoPage";
-import InteractiveDemo from "./pages/InteractiveDemo";
-import ValidationDemo from "./pages/ValidationDemo";
-import ShopifyDemo from "./pages/ShopifyDemo";
-import ChatDemo from "./pages/ChatDemo";
-import OrdersDemo from "./pages/OrdersDemo";
-import TrackingDemo from "./pages/TrackingDemo";
-import LeadsDemo from "./pages/LeadsDemo";
-import SettingsDemo from "./pages/SettingsDemo";
-import StudioIADemo from "./pages/StudioIADemo";
-import CRMDemo from "./pages/CRMDemo";
-import ScheduleDemoPage from "./pages/ScheduleDemoPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import { EmailVerificationPage } from "./pages/EmailVerificationPage";
+import ProfilePage from "./pages/ProfilePage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
+
+// Post-MVP — lazy
+const WorkflowExample = lazy(() =>
+  import("./components/workflow/WorkflowExample").then((m) => ({ default: m.WorkflowExample })),
+);
+const ValidationPage = lazy(() => import("./pages/ValidationPage"));
+const ChatPage = lazy(() => import("./pages/ChatPage"));
+const LeadsPage = lazy(() => import("./pages/LeadsPage"));
+const ShopifyPage = lazy(() => import("./pages/ShopifyPage"));
+const ShopifyConnectPage = lazy(() => import("./pages/ShopifyConnectPage"));
+const BillingPage = lazy(() => import("./pages/BillingPage"));
+const KeyboardShortcutsPage = lazy(() => import("./pages/KeyboardShortcutsPage"));
+const TeamIndexPage = lazy(() => import("./pages/TeamIndexPage"));
+const TeamNewPage = lazy(() => import("./pages/TeamNewPage"));
+const TeamInvitePage = lazy(() => import("./pages/TeamInvitePage"));
+const OrderValidationPage = lazy(() => import("./pages/OrderValidationPage"));
+const TrackingPage = lazy(() => import("./pages/TrackingPage"));
+const StudioIAPage = lazy(() => import("./pages/StudioIAPage"));
+const ProductImageGeneratorPage = lazy(() => import("./pages/ProductImageGeneratorPage"));
+const CopywritingPage = lazy(() => import("./pages/CopywritingPage"));
+const LogoGeneratorPage = lazy(() => import("./pages/LogoGeneratorPage"));
+const AgentBuilderPage = lazy(() => import("./pages/AgentBuilderPage"));
+const AgentHubPage = lazy(() => import("./pages/AgentHubPage"));
+const WhatsAppIntegrationPage = lazy(() => import("./pages/WhatsAppIntegrationPage"));
+const PriceOptimizerPage = lazy(() => import("./pages/PriceOptimizerPage"));
+const BrandIdentityPage = lazy(() => import("./pages/BrandIdentityPage"));
+const WebsiteBuilderPage = lazy(() => import("./pages/WebsiteBuilderPage"));
+
+// Demos — lazy (mocks internos)
+const DemoPage = lazy(() => import("./pages/DemoPage"));
+const InteractiveDemo = lazy(() => import("./pages/InteractiveDemo"));
+const ValidationDemo = lazy(() => import("./pages/ValidationDemo"));
+const ShopifyDemo = lazy(() => import("./pages/ShopifyDemo"));
+const ChatDemo = lazy(() => import("./pages/ChatDemo"));
+const OrdersDemo = lazy(() => import("./pages/OrdersDemo"));
+const TrackingDemo = lazy(() => import("./pages/TrackingDemo"));
+const LeadsDemo = lazy(() => import("./pages/LeadsDemo"));
+const SettingsDemo = lazy(() => import("./pages/SettingsDemo"));
+const StudioIADemo = lazy(() => import("./pages/StudioIADemo"));
+const CRMDemo = lazy(() => import("./pages/CRMDemo"));
+const ScheduleDemoPage = lazy(() => import("./pages/ScheduleDemoPage"));
 
 const queryClient = new QueryClient();
 
@@ -71,7 +80,8 @@ const AppContent = () => {
       <Sonner />
 
       <BrowserRouter>
-        <Routes>
+        <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <Routes>
               {/* Rutas públicas */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/workflow" element={<WorkflowExample />} />
@@ -91,10 +101,10 @@ const AppContent = () => {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<EmailVerificationPage />} />
               <Route path="/auth/success" element={<AuthSuccessPage />} />
-              
+
               {/* Onboarding */}
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-              
+
               {/* Rutas protegidas */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/validation" element={<ProtectedRoute><ValidationPage /></ProtectedRoute>} />
@@ -125,10 +135,11 @@ const AppContent = () => {
                        <Route path="/team" element={<ProtectedRoute><TeamIndexPage /></ProtectedRoute>} />
                        <Route path="/team/new" element={<ProtectedRoute><TeamNewPage /></ProtectedRoute>} />
                        <Route path="/team/invite/:channel" element={<ProtectedRoute><TeamInvitePage /></ProtectedRoute>} />
-              
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </>
   );
