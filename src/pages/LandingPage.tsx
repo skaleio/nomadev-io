@@ -1,5 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useCallback, memo } from 'react';
+import { toast } from 'sonner';
+import { getLandingContactWebhookUrl } from '@/lib/landing-contact-webhook';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +37,7 @@ import {
   Menu,
   X,
   Lock,
+  Loader2,
 } from 'lucide-react';
 
 
@@ -224,6 +227,13 @@ const LandingPage = memo(() => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [demoLeadForm, setDemoLeadForm] = useState({
+    fullName: '',
+    email: '',
+    company: '',
+    phone: '',
+  });
+  const [demoLeadSubmitting, setDemoLeadSubmitting] = useState(false);
 
   const openSupportDialog = useCallback(() => {
     const wasMobileMenu = isMobileMenuOpen;
@@ -271,6 +281,55 @@ const LandingPage = memo(() => {
   const toggleFAQ = useCallback((index: number) => {
     setOpenFAQ(prev => prev === index ? null : index);
   }, []);
+
+  const handleDemoLeadSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (demoLeadSubmitting) return;
+
+    if (!demoLeadForm.fullName.trim() || !demoLeadForm.email.trim()) {
+      toast.error('Nombre y email son obligatorios');
+      return;
+    }
+
+    const webhookUrl = getLandingContactWebhookUrl();
+    if (!webhookUrl) {
+      toast.error('No hay endpoint configurado', {
+        description: 'Definí VITE_LANDING_SUPPORT_WEBHOOK_URL o VITE_DEMO_CONTACT_WEBHOOK_URL en tu .env',
+      });
+      return;
+    }
+
+    try {
+      setDemoLeadSubmitting(true);
+      const payload = {
+        ...demoLeadForm,
+        source: 'landing-solicitar-demo',
+        page: typeof window !== 'undefined' ? window.location.pathname : null,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        submittedAt: new Date().toISOString(),
+      };
+
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      toast.success('¡Listo!', {
+        description: 'Recibimos tu solicitud de demo. Te contactamos pronto.',
+      });
+      setDemoLeadForm({ fullName: '', email: '', company: '', phone: '' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error('No pudimos enviar el formulario', { description: message });
+    } finally {
+      setDemoLeadSubmitting(false);
+    }
+  }, [demoLeadForm, demoLeadSubmitting]);
 
   // Función para scroll suave a las secciones
   const scrollToSection = useCallback((e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
@@ -1181,15 +1240,22 @@ const LandingPage = memo(() => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 relative z-10">
-                  <form className="space-y-6">
+                  <form className="space-y-6" onSubmit={handleDemoLeadSubmit}>
                     <div className="space-y-6">
                       {/* Nombre */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-fullName" className="block text-sm font-medium text-gray-300">
                           Nombre completo
                         </label>
                         <input
+                          id="demo-lead-fullName"
+                          name="fullName"
                           type="text"
+                          autoComplete="name"
+                          value={demoLeadForm.fullName}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, fullName: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="Juan Pérez"
                         />
@@ -1197,11 +1263,18 @@ const LandingPage = memo(() => {
 
                       {/* Email */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-email" className="block text-sm font-medium text-gray-300">
                           Correo electrónico
                         </label>
                         <input
+                          id="demo-lead-email"
+                          name="email"
                           type="email"
+                          autoComplete="email"
+                          value={demoLeadForm.email}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, email: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="juan@empresa.com"
                         />
@@ -1209,11 +1282,18 @@ const LandingPage = memo(() => {
 
                       {/* Empresa */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-company" className="block text-sm font-medium text-gray-300">
                           Empresa
                         </label>
                         <input
+                          id="demo-lead-company"
+                          name="company"
                           type="text"
+                          autoComplete="organization"
+                          value={demoLeadForm.company}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, company: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="Mi Tienda Online"
                         />
@@ -1221,11 +1301,18 @@ const LandingPage = memo(() => {
 
                       {/* WhatsApp */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-phone" className="block text-sm font-medium text-gray-300">
                           Número de WhatsApp
                         </label>
                         <input
+                          id="demo-lead-phone"
+                          name="phone"
                           type="tel"
+                          autoComplete="tel"
+                          value={demoLeadForm.phone}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, phone: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="+56948576839"
                         />
@@ -1236,9 +1323,17 @@ const LandingPage = memo(() => {
                     <div className="pt-4">
                       <Button 
                         type="submit" 
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-colors duration-200"
+                        disabled={demoLeadSubmitting}
+                        className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-colors duration-200 disabled:opacity-70"
                       >
-                        Solicitar Demo
+                        {demoLeadSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                            Enviando…
+                          </>
+                        ) : (
+                          'Solicitar Demo'
+                        )}
                       </Button>
                     </div>
                   </form>

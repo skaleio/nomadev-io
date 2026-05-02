@@ -23,13 +23,7 @@ import {
   Send,
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-/** Webhook dedicado al formulario Soporte de la landing. Si no está, reutiliza el de demo/contacto. */
-const getWebhookUrl = (): string => {
-  const landing = import.meta.env.VITE_LANDING_SUPPORT_WEBHOOK_URL?.trim();
-  const fallback = import.meta.env.VITE_DEMO_CONTACT_WEBHOOK_URL?.trim();
-  return landing || fallback || '';
-};
+import { getLandingContactWebhookUrl } from '@/lib/landing-contact-webhook';
 
 interface SupportContactDialogProps {
   open: boolean;
@@ -82,7 +76,7 @@ export const SupportContactDialog: React.FC<SupportContactDialogProps> = ({ open
       return;
     }
 
-    const webhookUrl = getWebhookUrl();
+    const webhookUrl = getLandingContactWebhookUrl();
     if (!webhookUrl) {
       toast.error('No hay endpoint configurado', {
         description: 'Definí VITE_LANDING_SUPPORT_WEBHOOK_URL o VITE_DEMO_CONTACT_WEBHOOK_URL en tu .env',
