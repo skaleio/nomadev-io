@@ -6,6 +6,15 @@ import { NomaDatePicker } from "@/components/ui/noma-date-picker";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MetricCard } from "@/features/dashboard/components/MetricCard";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase/client";
@@ -55,6 +64,8 @@ import {
   History,
   FileSpreadsheet,
   Trash2,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -231,6 +242,8 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
   const [historyLoading, setHistoryLoading] = useState(false);
   type ImportHistoryRow = Pick<Tables<"dropi_order_imports">, "id" | "source_filename" | "row_count" | "created_at">;
   const [importHistory, setImportHistory] = useState<ImportHistoryRow[]>([]);
+  const [importPendingDelete, setImportPendingDelete] = useState<ImportHistoryRow | null>(null);
+  const [deleteImportBusy, setDeleteImportBusy] = useState(false);
 
   const filters: DropiMetricsFilters = useMemo(() => ({ region, product, carrier }), [region, product, carrier]);
 
@@ -1189,10 +1202,10 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
     toast.success("Panel reiniciado: sube una nueva guía o cargá una del historial");
   };
 
-  const deleteImportFromHistory = async (importId: string) => {
-    if (!userId) return;
-    const ok = window.confirm("¿Borrar esta subida y sus pedidos asociados?");
-    if (!ok) return;
+  const executeDeleteImport = async () => {
+    if (!userId || !importPendingDelete) return;
+    const importId = importPendingDelete.id;
+    setDeleteImportBusy(true);
     try {
       const { error } = await supabase
         .from("dropi_order_imports")
@@ -1207,9 +1220,12 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
         setOrders([]);
         signalDashboardResync();
       }
+      setImportPendingDelete(null);
       toast.success("Subida eliminada");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "No se pudo borrar");
+    } finally {
+      setDeleteImportBusy(false);
     }
   };
 
@@ -3003,7 +3019,7 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
                         variant="ghost"
                         size="icon"
                         className="shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => void deleteImportFromHistory(imp.id)}
+                        onClick={() => setImportPendingDelete(imp)}
                         title="Borrar esta subida"
                         aria-label="Borrar subida"
                       >
@@ -3017,6 +3033,81 @@ export function DropiOrdersPanel({ userId }: DropiOrdersPanelProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={!!importPendingDelete}
+        onOpenChange={(open) => {
+          if (!open && deleteImportBusy) return;
+          if (!open) setImportPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent
+          className="sm:max-w-[420px] gap-0 overflow-hidden border border-border/50 bg-card/95 p-0 shadow-2xl shadow-black/40 backdrop-blur-xl sm:rounded-2xl"
+          onPointerDownOutside={(e) => deleteImportBusy && e.preventDefault()}
+          onEscapeKeyDown={(e) => deleteImportBusy && e.preventDefault()}
+        >
+          <div className="relative px-6 pt-7 pb-2">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500/25 via-rose-500/10 to-amber-500/10 ring-1 ring-rose-500/35 shadow-[0_0_32px_-8px_rgba(244,63,94,0.45)]">
+              <Trash2 className="size-7 text-rose-300" strokeWidth={1.75} />
+            </div>
+            <AlertDialogHeader className="space-y-3 text-center sm:text-center">
+              <AlertDialogTitle className="text-xl font-semibold tracking-tight text-foreground">
+                ¿Eliminar esta subida?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed text-center">
+                Se borrará el registro de esta importación y los pedidos asociados en tu cuenta. Esta acción no se puede
+                deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {importPendingDelete && (
+              <div className="mt-5 rounded-xl border border-border/60 bg-muted/25 px-4 py-3.5 shadow-inner">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-background/80 ring-1 ring-border/50">
+                    <FileSpreadsheet className="size-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <p className="truncate text-sm font-medium text-foreground" title={importPendingDelete.source_filename}>
+                      {importPendingDelete.source_filename}
+                    </p>
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      {new Date(importPendingDelete.created_at).toLocaleString("es-CL", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      · {importPendingDelete.row_count} filas
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200/90">
+                  <AlertTriangle className="size-4 shrink-0 text-amber-400/90 mt-0.5" />
+                  <span>Si esta subida está activa en el panel, el panel quedará vacío hasta que cargues otra guía.</span>
+                </div>
+              </div>
+            )}
+          </div>
+          <AlertDialogFooter className="flex-col-reverse gap-2 border-t border-border/40 bg-muted/15 px-6 py-4 sm:flex-row sm:justify-end sm:gap-3">
+            <AlertDialogCancel
+              disabled={deleteImportBusy}
+              className="mt-0 w-full border-border/60 bg-background/80 text-foreground hover:bg-muted/80 sm:w-auto"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteImportBusy}
+              className="w-full gap-2 bg-gradient-to-r from-rose-600 to-rose-700 text-white shadow-lg shadow-rose-900/25 hover:from-rose-500 hover:to-rose-600 sm:w-auto"
+              onClick={() => void executeDeleteImport()}
+            >
+              {deleteImportBusy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              {deleteImportBusy ? "Eliminando…" : "Eliminar definitivamente"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

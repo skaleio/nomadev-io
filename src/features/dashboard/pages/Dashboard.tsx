@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import {
   TrendingUp,
   Users,
@@ -143,9 +142,6 @@ export default function Dashboard() {
     { label: 'Generador de Imágenes', icon: ImageIcon, note: 'Producto + lifestyle a un clic.' },
     { label: 'Website Builder', icon: Globe, note: 'Landings de producto auto-generadas.' },
   ];
-
-  const showLockedToast = (label: string, note: string) =>
-    toast(`${label} — Próximamente`, { description: note });
 
   return (
     <DashboardLayout>
@@ -346,7 +342,8 @@ export default function Dashboard() {
                     className="w-full justify-start text-muted-foreground"
                     variant="outline"
                     size="sm"
-                    onClick={() => showLockedToast(s.label, s.note)}
+                    type="button"
+                    disabled
                   >
                     <s.icon className="size-4" />
                     <span className="flex-1 text-left">{s.label}</span>
@@ -372,22 +369,22 @@ export default function Dashboard() {
           <CardContent>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {lockedShortcuts.map((s) => (
-                <button
+                <div
                   key={s.label}
-                  type="button"
-                  onClick={() => showLockedToast(s.label, s.note)}
-                  className="group relative overflow-hidden rounded-xl border border-border/60 bg-card p-4 text-left transition-all duration-base ease-standard hover:border-primary/30 hover:bg-primary/[0.03] hover:shadow-elev-1"
+                  role="note"
+                  aria-label={`${s.label}, disponible próximamente`}
+                  className="relative cursor-default overflow-hidden rounded-xl border border-border/60 bg-card p-4 text-left"
                 >
                   <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
                     <Lock className="size-2.5" />
                     Soon
                   </div>
-                  <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/20 transition-transform duration-base group-hover:scale-105">
+                  <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/20">
                     <s.icon className="size-[18px]" strokeWidth={1.75} />
                   </div>
                   <div className="text-sm font-semibold tracking-tight text-foreground">{s.label}</div>
                   <div className="mt-1 text-xs text-muted-foreground leading-relaxed">{s.note}</div>
-                </button>
+                </div>
               ))}
             </div>
           </CardContent>

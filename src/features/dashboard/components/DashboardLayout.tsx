@@ -29,7 +29,6 @@ import {
   Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { useNotifications } from "@/features/notifications/hooks/useNotifications";
@@ -386,12 +385,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         <SidebarMenuButton
                           tooltip={`${item.title} — Próximamente`}
                           className="text-sm opacity-60 cursor-not-allowed hover:bg-sidebar-accent/40"
-                          onClick={() =>
-                            toast(`${item.title} — Próximamente`, {
-                              description:
-                                item.comingSoonNote ?? "Esta herramienta llega en la próxima release.",
-                            })
-                          }
                         >
                           <item.icon className="size-4" strokeWidth={1.75} />
                           <span className="flex-1 truncate">{item.title}</span>

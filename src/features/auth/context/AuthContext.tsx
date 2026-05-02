@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
-import { supabase } from '@/lib/supabase/client';
+import { isSupabaseConfigured, supabase } from '@/lib/supabase/client';
 import {
   clearDropiActiveImportId,
   clearDropiSessionPrefs,
@@ -69,12 +69,15 @@ const buildQuickUser = (supabaseUser: SupabaseUser): User => ({
   onboardingCompletedAt: onboardingCompletedAtFromSupabaseUser(supabaseUser),
 });
 
+const SUPABASE_ENV_HINT =
+  'Si esto es producción, revisa en Vercel que existan VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY y vuelve a desplegar (Vite solo las inyecta en el build).';
+
 const mapAuthErrorMessage = (msg: string): string => {
   if (msg.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.';
   if (msg.includes('Email not confirmed')) return 'Por favor confirma tu email antes de iniciar sesión.';
   if (msg.includes('Too many requests')) return 'Demasiados intentos. Espera unos minutos antes de volver a intentar.';
   if (msg.includes('Network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
-    return 'Error de conexión. Verifica tu internet y que la app pueda conectar con Supabase.';
+    return `No se pudo contactar con Supabase (red o URL del proyecto). ${SUPABASE_ENV_HINT}`;
   }
   if (msg === 'LOGIN_TIMEOUT') return 'La conexión con Supabase tardó demasiado. Verifica tu conexión a internet.';
   return msg || 'Error inesperado al iniciar sesión';
@@ -287,6 +290,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = useCallback(async (email: string, password: string) => {
     setError(null);
 
+    if (!isSupabaseConfigured) {
+      const m = `La app no tiene configurado Supabase en este despliegue. ${SUPABASE_ENV_HINT}`;
+      setError(m);
+      throw new Error(m);
+    }
+
     // Login de prueba solo si está habilitado por env.
     const allowTestLogin = import.meta.env.VITE_ALLOW_TEST_LOGIN === 'true';
     const testEmail = import.meta.env.VITE_TEST_LOGIN_EMAIL;
@@ -353,6 +362,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loginWithGoogle = useCallback(async () => {
     setError(null);
+    if (!isSupabaseConfigured) {
+      const m = `La app no tiene configurado Supabase en este despliegue. ${SUPABASE_ENV_HINT}`;
+      setError(m);
+      throw new Error(m);
+    }
     markExpectFreshDropiLogin();
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -375,6 +389,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     lastName: string;
   }) => {
     setError(null);
+    if (!isSupabaseConfigured) {
+      const m = `La app no tiene configurado Supabase en este despliegue. ${SUPABASE_ENV_HINT}`;
+      setError(m);
+      throw new Error(m);
+    }
     try {
       const { data, error } = await supabase.auth.signUp({
         email: userData.email,

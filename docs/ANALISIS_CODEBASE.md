@@ -27,7 +27,7 @@
 ### Backends/integraciones
 - **Supabase Edge Functions**: 22 funciones en `supabase/functions/` (Shopify, Dropi/Easydrop, WhatsApp, n8n, IA, etc.)
 - **`shopify-backend/`**: proyecto Node separado en raíz — contiene SOLO `package.json` y `package-lock.json` (sin código fuente). Stub o legacy.
-- **`test0/` y `test1/`**: scaffolds de Shopify CLI (toml + extensions). NO forman parte del build de la SPA.
+- **`external/shopify-scaffolds/test0/` y `test1/`**: scaffolds de Shopify CLI (toml + extensions). NO forman parte del build de la SPA.
 - `scripts/`: helpers ngrok para túnel de desarrollo (3 archivos).
 
 ---
@@ -78,7 +78,7 @@ nomadev-io/
 ├── docs/                               7 .md + 1 .html
 ├── scripts/                            3 helpers ngrok
 ├── shopify-backend/                    [stub: solo package.json]
-├── test0/, test1/                      [Shopify CLI scaffolds, no SPA]
+├── external/shopify-scaffolds/test0/, test1/  [Shopify CLI scaffolds, no SPA]
 ├── public/, dist/                      assets / build output
 └── archivos raíz: 12+ .ps1/.bat/.sh/.toml/.json
 ```
@@ -176,7 +176,7 @@ nomadev-io/
 | `src/types/workflow.ts`                              | `src/features/workflow/types.ts`            | Tipo único pegado a su feature. |
 | `src/integrations/supabase/types.ts` (817 LOC)       | OK aquí (autogen) pero documentar regla     | Autogenerado por `supabase gen types`. |
 | `shopify-backend/`                                   | borrar (solo `package.json`)                | Stub vacío. |
-| `test0/`, `test1/`                                   | Mover a `external/` o documentar            | No son tests; son scaffolds Shopify CLI. |
+| `external/shopify-scaffolds/test0/`, `test1/`         | Documentar uso de Shopify CLI               | No son tests; son scaffolds aparte del build SPA. |
 
 ### d) Código muerto
 
@@ -416,7 +416,7 @@ src/
 3. **`SecurityDashboard.tsx` y `WhatsAppChatPage.tsx`**: ¿son páginas pendientes de cablear o limpieza pendiente?
 4. **Sonner vs Toast shadcn**: ¿se mantienen los dos o se elige uno?
 5. **`bun.lockb` + `package-lock.json`**: ¿npm o bun? Borrar el otro.
-6. **`shopify-backend/`, `test0/`, `test1/`**: ¿son legacy/scaffolds que se pueden archivar fuera del repo, o se siguen usando?
+6. **`shopify-backend/`** (si existiera), **`external/shopify-scaffolds/`**: ¿legacy o se siguen usando para extensiones Shopify?
 
 ---
 
@@ -506,5 +506,5 @@ Detectados durante la auditoría con MCP, pero NO corregidos en este refactor (c
 3. **Archivos gigantes**: `DropiOrdersPanel.tsx` (1837 LOC), `LandingPage.tsx` (1777 LOC), `AgentBuilderPage.tsx` (1284 LOC). Candidatos a partir en sub-componentes.
 4. **TS errors pre-existentes**: 296 errores baseline siguen ahí. La mayoría son tipos de Supabase con queries que apuntan a columnas que no existen. Auditar tras el saneo de DB.
 5. **`bun.lockb` ya borrado** — npm es ahora el package manager canónico.
-6. **`test0/` y `test1/`**: scaffolds Shopify CLI, sin código de SPA. Quedan donde están (no afectan build), candidatos a archivar fuera del repo.
+6. **`external/shopify-scaffolds/test0/` y `test1/`**: scaffolds Shopify CLI, sin código de SPA. No afectan el build de la SPA; trabajo con `shopify app dev` desde esas carpetas.
 

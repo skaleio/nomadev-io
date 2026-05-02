@@ -41,6 +41,7 @@ La app se sirve en `http://localhost:5173`.
 ## Estructura del proyecto
 
 ```
+external/shopify-scaffolds/  # Proyectos Shopify CLI (extensiones); no forman parte del build de la SPA
 src/
 ├── components/   # Componentes UI y de negocio
 ├── contexts/     # React contexts (Auth, Theme, WebSocket, etc.)
@@ -57,6 +58,7 @@ src/
 
 - [Configuración y variables de entorno](docs/SETUP.md)
 - [Integración frontend](docs/frontend-integration.md)
+- [Auditoría / mapa del código](docs/ANALISIS_CODEBASE.md)
 
 ## Variables de entorno
 
