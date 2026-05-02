@@ -1,7 +1,8 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { disableDemoMode, isDemoMode } from '@/lib/demoMode';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -10,6 +11,14 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
+
+  // Si el usuario está autenticado de verdad, limpiamos el flag de demo
+  // para que el sidebar y rutas vuelvan a su comportamiento normal.
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      disableDemoMode();
+    }
+  }, [isAuthenticated, user]);
 
   if (isLoading) {
     return (
@@ -23,6 +32,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   }
 
   if (!isAuthenticated || !user) {
+    // Si el usuario llegó desde el demo, lo dejamos navegar por las
+    // herramientas reales en modo lectura (sin datos) en lugar de
+    // mandarlo al login. El sidebar se encargará de mapear los links
+    // a sus rutas /*-demo cuando exista una.
+    if (isDemoMode()) {
+      return <>{children}</>;
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -30,4 +46,3 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 };
 
 export default ProtectedRoute;
-

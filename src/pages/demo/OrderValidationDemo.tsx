@@ -4,11 +4,11 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashboardLayout } from '@/features/dashboard/components/DashboardLayout';
-import { OrdersManagementSimulation } from './components/OrdersManagementSimulation';
+import { OrdersValidationSimulation } from './components/OrdersValidationSimulation';
 import { enableDemoMode } from '@/lib/demoMode';
 
-const OrdersDemo: React.FC = () => {
-  useDocumentTitle('Gestión de Pedidos - Demo');
+const OrderValidationDemo: React.FC = () => {
+  useDocumentTitle('Validación de Pedidos - Demo');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,10 +27,10 @@ const OrdersDemo: React.FC = () => {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Volver al demo principal
         </Button>
-        <OrdersManagementSimulation />
+        <OrdersValidationSimulation />
       </div>
     </DashboardLayout>
   );
 };
 
-export default OrdersDemo;
+export default OrderValidationDemo;

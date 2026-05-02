@@ -25,7 +25,8 @@ import {
   Keyboard,
   UserPlus,
   Plus,
-  Lock
+  Lock,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -77,6 +78,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { isGloballyLockedPath } from "@/lib/lockedNavPaths";
 import { CommandPalette, useCommandPalette } from "@/features/command-palette/CommandPalette";
+import { isDemoMode, disableDemoMode, mapToDemoRoute, DEMO_ROUTE_MAP } from "@/lib/demoMode";
+import { ContactDemoDialog } from "@/features/demo/ContactDemoDialog";
+import { ExitDemoDialog } from "@/features/demo/ExitDemoDialog";
 
 type NavItem = {
   title: string;
@@ -243,7 +247,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated } = useAuth();
+  // Modo demo: el visitante llegó desde "Ver Demo Interactiva". El sidebar
+  // mapea cada link a su versión /*-demo y desbloquea las herramientas que
+  // tienen una simulación disponible.
+  const inDemo = !isAuthenticated && isDemoMode();
   const { 
     notifications, 
     isVisible, 
@@ -272,9 +280,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const { open: isCommandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
   const [hasShopifyConnection, setHasShopifyConnection] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
 
   const isActive = (path: string) => {
-    return currentPath === path;
+    if (currentPath === path) return true;
+    // En modo demo, marcamos como activo el link cuya versión /*-demo
+    // coincide con la URL actual.
+    if (inDemo && DEMO_ROUTE_MAP[path] === currentPath) return true;
+    return false;
+  };
+
+  const resolveNavUrl = (path: string) => (inDemo ? mapToDemoRoute(path) : path);
+
+  const confirmExitDemo = () => {
+    disableDemoMode();
+    setExitOpen(false);
+    navigate("/");
   };
 
   // Verificar si hay conexión de Shopify
@@ -328,11 +350,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild className="justify-center">
-                <NavLink to="/dashboard" className="flex w-full items-center justify-center">
+                <NavLink to={resolveNavUrl('/dashboard')} className="flex w-full items-center justify-center">
                   <div className="grid leading-tight text-center">
                     <span className="font-orbitron wordmark-glow text-sm uppercase tracking-[0.14em]">
                       NOMADEV.IO
                     </span>
+                    {inDemo && (
+                      <span className="mt-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-emerald-400">
+                        Modo demo
+                      </span>
+                    )}
                   </div>
                 </NavLink>
               </SidebarMenuButton>
@@ -347,43 +374,92 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {navigationItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    {item.locked ? (
-                      <SidebarMenuButton
-                        tooltip={`${item.title} — Próximamente`}
-                        className="text-sm opacity-60 cursor-not-allowed hover:bg-sidebar-accent/40"
-                        onClick={() =>
-                          toast(`${item.title} — Próximamente`, {
-                            description:
-                              item.comingSoonNote ?? "Esta herramienta llega en la próxima release.",
-                          })
-                        }
-                      >
-                        <item.icon className="size-4" strokeWidth={1.75} />
-                        <span className="flex-1 truncate">{item.title}</span>
-                        <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
-                          <Lock className="size-2.5" /> Soon
-                        </span>
-                      </SidebarMenuButton>
-                    ) : (
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive(item.url)}
-                        tooltip={item.title}
-                        className="text-sm"
-                      >
-                        <NavLink to={item.url}>
+                {navigationItems.map((item) => {
+                  // En modo demo, una herramienta "locked" se desbloquea si
+                  // existe un demo equivalente en DEMO_ROUTE_MAP.
+                  const hasDemoRoute = item.url in DEMO_ROUTE_MAP;
+                  const showAsLocked = item.locked && !(inDemo && hasDemoRoute);
+                  const targetUrl = resolveNavUrl(item.url);
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      {showAsLocked ? (
+                        <SidebarMenuButton
+                          tooltip={`${item.title} — Próximamente`}
+                          className="text-sm opacity-60 cursor-not-allowed hover:bg-sidebar-accent/40"
+                          onClick={() =>
+                            toast(`${item.title} — Próximamente`, {
+                              description:
+                                item.comingSoonNote ?? "Esta herramienta llega en la próxima release.",
+                            })
+                          }
+                        >
                           <item.icon className="size-4" strokeWidth={1.75} />
-                          <span>{item.title}</span>
-                        </NavLink>
-                      </SidebarMenuButton>
-                    )}
-                  </SidebarMenuItem>
-                ))}
+                          <span className="flex-1 truncate">{item.title}</span>
+                          <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-warning">
+                            <Lock className="size-2.5" /> Soon
+                          </span>
+                        </SidebarMenuButton>
+                      ) : (
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(item.url)}
+                          tooltip={inDemo ? `${item.title} (demo)` : item.title}
+                          className="text-sm"
+                        >
+                          <NavLink to={targetUrl}>
+                            <item.icon className="size-4" strokeWidth={1.75} />
+                            <span className="flex-1 truncate">{item.title}</span>
+                            {inDemo && (
+                              <span className="ml-auto inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-300">
+                                Demo
+                              </span>
+                            )}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+
+          {inDemo && (
+            <SidebarGroup className="mt-2">
+              <SidebarGroupLabel className="text-2xs font-medium uppercase tracking-wider text-emerald-400/80">
+                Modo demostración
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <div className="px-2 pb-1.5 group-data-[collapsible=icon]:hidden">
+                  <p className="text-[11px] leading-relaxed text-gray-400">
+                    Estás explorando datos simulados. ¿Querés hablar con nosotros?
+                  </p>
+                </div>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => setContactOpen(true)}
+                      tooltip="Contactar al equipo"
+                      className="text-sm border border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20 hover:text-emerald-100 shadow-sm shadow-emerald-500/10"
+                    >
+                      <Mail className="size-4" strokeWidth={1.75} />
+                      <span className="flex-1 truncate font-medium">Contactar</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => setExitOpen(true)}
+                      tooltip="Salir y volver al inicio"
+                      className="mt-1 text-sm border border-gray-700/60 bg-gray-800/40 text-gray-300 hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-200 transition-colors"
+                    >
+                      <LogOut className="size-4" strokeWidth={1.75} />
+                      <span className="flex-1 truncate">Salir de la demo</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
 
           {hasShopifyConnection && (
             <SidebarGroup>
@@ -575,6 +651,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     </SidebarProvider>
 
     <CommandPalette open={isCommandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+    {inDemo && (
+      <>
+        <ContactDemoDialog open={contactOpen} onOpenChange={setContactOpen} />
+        <ExitDemoDialog
+          open={exitOpen}
+          onOpenChange={setExitOpen}
+          onConfirm={confirmExitDemo}
+          onContact={() => setContactOpen(true)}
+        />
+      </>
+    )}
     </TooltipProvider>
   );
 }

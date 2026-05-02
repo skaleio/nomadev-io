@@ -26,6 +26,7 @@ import DropiConnectPage from "@/features/dropi/pages/DropiConnectPage";
 import ProfilePage from "@/features/profile/pages/ProfilePage";
 import SettingsPage from "@/features/settings/pages/SettingsPage";
 import NotFound from "@/pages/NotFound";
+import SubscribePage from "@/pages/SubscribePage";
 
 // Post-MVP — lazy
 const WorkflowExamplePage = lazy(() =>
@@ -61,6 +62,7 @@ const ValidationDemo = lazy(() => import("@/pages/demo/ValidationDemo"));
 const ShopifyDemo = lazy(() => import("@/pages/demo/ShopifyDemo"));
 const ChatDemo = lazy(() => import("@/pages/demo/ChatDemo"));
 const OrdersDemo = lazy(() => import("@/pages/demo/OrdersDemo"));
+const OrderValidationDemo = lazy(() => import("@/pages/demo/OrderValidationDemo"));
 const TrackingDemo = lazy(() => import("@/pages/demo/TrackingDemo"));
 const LeadsDemo = lazy(() => import("@/pages/demo/LeadsDemo"));
 const SettingsDemo = lazy(() => import("@/pages/demo/SettingsDemo"));
@@ -82,6 +84,7 @@ const AppContent = () => {
           <Routes>
               {/* Rutas públicas */}
               <Route path="/" element={<LandingPage />} />
+              <Route path="/suscribirse" element={<SubscribePage />} />
               <Route path="/workflow" element={<WorkflowExamplePage />} />
               <Route path="/demo" element={<DemoPage />} />
               <Route path="/interactive-demo" element={<InteractiveDemo />} />
@@ -89,6 +92,7 @@ const AppContent = () => {
               <Route path="/shopify-demo" element={<ShopifyDemo />} />
               <Route path="/chat-demo" element={<ChatDemo />} />
               <Route path="/orders-demo" element={<OrdersDemo />} />
+              <Route path="/order-validation-demo" element={<OrderValidationDemo />} />
               <Route path="/tracking-demo" element={<TrackingDemo />} />
               <Route path="/leads-demo" element={<LeadsDemo />} />
               <Route path="/settings-demo" element={<SettingsDemo />} />

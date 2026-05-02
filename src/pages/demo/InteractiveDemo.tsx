@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from "@/features/dashboard/components/DashboardLayout";
+import { enableDemoMode } from '@/lib/demoMode';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MetricCard } from "@/features/dashboard/components/MetricCard";
 import { StatusBadge } from "@/features/dashboard/components/StatusBadge";
-import { 
-  TrendingUp, 
-  Shield, 
-  MessageSquare, 
-  Users, 
+import { CRMPipelineSimulation } from './components/CRMPipelineSimulation';
+import { OrdersValidationSimulation } from './components/OrdersValidationSimulation';
+import { OrdersManagementSimulation } from './components/OrdersManagementSimulation';
+import { ChatSimulation } from './components/ChatSimulation';
+import { LeadsSimulation } from './components/LeadsSimulation';
+import { TrackingSimulation } from './components/TrackingSimulation';
+import { AnalyticsSimulation } from './components/AnalyticsSimulation';
+import { ValidationSimulation } from './components/ValidationSimulation';
+import { StudioIASimulation } from './components/StudioIASimulation';
+import { SettingsSimulation } from './components/SettingsSimulation';
+import {
+  TrendingUp,
+  Shield,
+  MessageSquare,
+  Users,
   DollarSign,
   ShoppingCart,
   AlertTriangle,
@@ -18,18 +29,15 @@ import {
   BarChart3,
   Settings,
   Truck,
-  Eye,
-  Clock,
   Package,
   Zap,
-  Activity,
   ChevronRight,
   ArrowLeft,
   ShoppingBag,
   UserCheck,
   Sparkles,
   X,
-  MessageCircle
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +48,12 @@ const InteractiveDemo = () => {
   const [showGuide, setShowGuide] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+
+  // Activamos el modo demo: el sidebar mapea sus links a rutas /*-demo
+  // y ProtectedRoute deja pasar al usuario sin redirigirlo a login.
+  useEffect(() => {
+    enableDemoMode();
+  }, []);
 
   // Mapping de navegación con sus secciones
   const navigationSections = [
@@ -219,273 +233,25 @@ const InteractiveDemo = () => {
     return currentStep || dashboardGuideSteps[0];
   };
 
-  const renderValidationContent = () => (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-gradient mb-2">Validador de Clientes</h1>
-        <p className="text-muted-foreground">Sistema de verificación automática de datos de clientes</p>
-      </div>
+  const renderValidationContent = () => <ValidationSimulation />;
 
-      {/* Métricas del Validador */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard
-          title="Clientes Validados"
-          value="2,847"
-          change={{ value: 15.3, type: "increase" }}
-          icon={Shield}
-          color="success"
-          description="este mes"
-        />
-        <MetricCard
-          title="Fraudes Detectados"
-          value="23"
-          change={{ value: 8.2, type: "decrease" }}
-          icon={AlertTriangle}
-          color="warning"
-          description="bloqueados"
-        />
-        <MetricCard
-          title="Tasa de Precisión"
-          value="99.9%"
-          change={{ value: 0.1, type: "increase" }}
-          icon={CheckCircle}
-          color="success"
-          description="exactitud"
-        />
-        <MetricCard
-          title="Validaciones Hoy"
-          value="156"
-          change={{ value: 12.7, type: "increase" }}
-          icon={Activity}
-          color="primary"
-          description="en proceso"
-        />
-      </div>
+  const renderStudioIAContent = () => <StudioIASimulation />;
 
-      {/* Panel de Validación */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
-              Validación en Tiempo Real
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {['Email Verificado', 'Teléfono Validado', 'Documento Verificado'].map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
-                  <span className="text-foreground">{item}</span>
-                  <CheckCircle className="h-5 w-5 text-success" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+  const renderCRMContent = () => <CRMPipelineSimulation />;
 
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              Alertas de Seguridad
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                <p className="text-sm text-destructive font-medium">IP Sospechosa Detectada</p>
-                <p className="text-xs text-muted-foreground">192.168.1.100 - 2 intentos fallidos</p>
-              </div>
-              <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
-                <p className="text-sm text-warning font-medium">Email Duplicado</p>
-                <p className="text-xs text-muted-foreground">usuario@ejemplo.com ya registrado</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+  const renderOrdersContent = () => <OrdersManagementSimulation />;
 
-  const renderStudioIAContent = () => (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-gradient mb-2">Studio IA</h1>
-        <p className="text-muted-foreground">Hub de herramientas de Inteligencia Artificial para potenciar tu ecommerce</p>
-      </div>
+  const renderOrderValidationContent = () => <OrdersValidationSimulation />;
 
-      {/* Herramientas de IA */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[
-          { title: 'Generador de Imágenes', icon: Sparkles, color: 'from-purple-500 to-pink-500', available: true },
-          { title: 'Copywriting IA', icon: MessageSquare, color: 'from-blue-500 to-cyan-500', available: true },
-          { title: 'Optimizador de Precios', icon: DollarSign, color: 'from-green-500 to-emerald-500', available: true },
-          { title: 'Identidad de Marca', icon: Users, color: 'from-orange-500 to-red-500', available: true },
-          { title: 'Website Builder', icon: BarChart3, color: 'from-indigo-500 to-purple-500', available: true },
-          { title: 'Constructor de Chatbots', icon: Zap, color: 'from-gray-500 to-gray-600', available: false },
-        ].map((tool, index) => (
-          <Card key={index} className="glass-card hover:scale-105 transition-transform">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-gradient-to-r ${tool.color} bg-opacity-20`}>
-                  <tool.icon className="h-6 w-6 text-white" />
-                </div>
-                <Badge className={tool.available ? "bg-success" : "bg-warning"}>
-                  {tool.available ? "Disponible" : "Próximamente"}
-                </Badge>
-              </div>
-              <h3 className="text-lg font-semibold mb-2">{tool.title}</h3>
-              <p className="text-muted-foreground text-sm">
-                {tool.available ? "Herramienta activa y lista para usar" : "Pronto disponible"}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+  const renderChatContent = () => <ChatSimulation />;
 
-      {/* Estadísticas de IA */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          { value: '95%', label: 'Reducción en tiempo', color: 'text-success' },
-          { value: '300%', label: 'Aumento en conversiones', color: 'text-primary' },
-          { value: '24/7', label: 'Disponibilidad', color: 'text-warning' },
-        ].map((stat, index) => (
-          <Card key={index} className="glass-card text-center">
-            <CardContent className="p-6">
-              <div className={`text-3xl font-bold ${stat.color} mb-2`}>{stat.value}</div>
-              <p className="text-muted-foreground">{stat.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+  const renderLeadsContent = () => <LeadsSimulation />;
 
-  const renderCRMContent = () => (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-gradient mb-2">CRM</h1>
-        <p className="text-muted-foreground">Sistema de gestión de relaciones con clientes</p>
-      </div>
+  const renderTrackingContent = () => <TrackingSimulation />;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard title="Clientes Totales" value="2,847" change={{ value: 15.3, type: "increase" }} icon={Users} color="success" description="activos" />
-        <MetricCard title="Oportunidades" value="156" change={{ value: 8.2, type: "increase" }} icon={TrendingUp} color="primary" description="en pipeline" />
-        <MetricCard title="Tasa de Conversión" value="23.4%" change={{ value: 2.1, type: "increase" }} icon={CheckCircle} color="success" description="mes actual" />
-        <MetricCard title="Valor Promedio" value="$1,247" change={{ value: 12.7, type: "increase" }} icon={DollarSign} color="success" description="por cliente" />
-      </div>
+  const renderAnalyticsContent = () => <AnalyticsSimulation />;
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-primary" />
-              Pipeline de Ventas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { label: 'Prospectos', count: 45, color: 'bg-blue-500' },
-                { label: 'Calificados', count: 23, color: 'bg-yellow-500' },
-                { label: 'Propuesta', count: 12, color: 'bg-orange-500' },
-                { label: 'Cerrados', count: 8, color: 'bg-success' },
-              ].map((stage, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted/10 rounded-lg">
-                  <span className="text-foreground">{stage.label}</span>
-                  <Badge className={stage.color}>{stage.count}</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Actividad Reciente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentActivity.slice(0, 3).map((activity) => (
-                <div key={activity.id} className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                  <p className="text-sm font-medium">{activity.message}</p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-
-  const renderOrdersContent = () => (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-3xl font-bold text-gradient mb-2">Gestión de Pedidos</h1>
-        <p className="text-muted-foreground">Plataforma integral para administrar todos tus pedidos</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard title="Pedidos Totales" value="1,247" change={{ value: 12.5, type: "increase" }} icon={Package} color="success" description="este mes" />
-        <MetricCard title="Pendientes" value="89" change={{ value: 8.3, type: "decrease" }} icon={Clock} color="warning" description="por procesar" />
-        <MetricCard title="Procesados" value="1,158" change={{ value: 15.2, type: "increase" }} icon={CheckCircle} color="success" description="completados" />
-        <MetricCard title="Valor Total" value="$45,678" change={{ value: 22.1, type: "increase" }} icon={DollarSign} color="success" description="en ventas" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              Estado de Pedidos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                { label: 'Nuevos', count: 23, color: 'bg-blue-500' },
-                { label: 'En Proceso', count: 45, color: 'bg-yellow-500' },
-                { label: 'Enviados', count: 67, color: 'bg-orange-500' },
-                { label: 'Entregados', count: 1112, color: 'bg-success' },
-              ].map((status, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-muted/10 rounded-lg">
-                  <span className="text-foreground">{status.label}</span>
-                  <Badge className={status.color}>{status.count}</Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-primary" />
-              Pedidos Recientes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[
-                { id: '#ORD-2024-001', customer: 'María González', amount: '$1,250', time: 'Hace 2 horas' },
-                { id: '#ORD-2024-002', customer: 'Carlos López', amount: '$890', time: 'Hace 4 horas' },
-                { id: '#ORD-2024-003', customer: 'Ana Martínez', amount: '$2,100', time: 'Hace 6 horas' },
-              ].map((order, index) => (
-                <div key={index} className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                  <p className="text-sm font-medium">{order.id}</p>
-                  <p className="text-xs text-muted-foreground">{order.customer} - {order.amount} - {order.time}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+  const renderSettingsContent = () => <SettingsSimulation />;
 
   const renderDefaultContent = (section: string) => {
     const sectionInfo = dashboardGuideSteps.find(step => step.section === section);
@@ -685,16 +451,21 @@ const InteractiveDemo = () => {
       case 'crm':
         return renderCRMContent();
       case 'orders':
-      case 'order-validation':
         return renderOrdersContent();
+      case 'order-validation':
+        return renderOrderValidationContent();
       case 'studio-ia':
         return renderStudioIAContent();
-      case 'analytics':
       case 'chat':
-      case 'tracking':
+        return renderChatContent();
       case 'leads':
+        return renderLeadsContent();
+      case 'tracking':
+        return renderTrackingContent();
+      case 'analytics':
+        return renderAnalyticsContent();
       case 'settings':
-        return renderDefaultContent(activeSection);
+        return renderSettingsContent();
       default:
         return renderDefaultContent('dashboard');
     }
@@ -703,12 +474,12 @@ const InteractiveDemo = () => {
   // Modal de bienvenida
   if (showModal) {
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-2xl glass-card shadow-2xl">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-2xl bg-gray-900/95 border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
           <CardHeader className="text-center pb-6">
             <div className="flex items-center justify-center mb-6">
               <div
-                className="text-3xl font-black text-primary transition-all duration-300 tracking-wider uppercase"
+                className="text-3xl font-black text-emerald-400 transition-all duration-300 tracking-wider uppercase"
                 style={{
                   fontFamily: "'Orbitron', 'Arial Black', sans-serif",
                   fontWeight: 900,
@@ -716,41 +487,46 @@ const InteractiveDemo = () => {
                   textShadow: '2px 2px 4px rgba(0,0,0,0.1)',
                   transform: 'skew(-3deg)',
                   display: 'inline-block',
-                  filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.5))'
+                  filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.5))',
                 }}
               >
                 NOMADEV.IO
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold mb-3">¡Bienvenido a NOMADEV.IO!</CardTitle>
-            <p className="text-muted-foreground text-lg">Descubre la revolución en validación de pedidos y automatización de procesos</p>
+            <CardTitle className="text-3xl font-bold mb-3 text-white">¡Bienvenido a NOMADEV.IO!</CardTitle>
+            <p className="text-gray-400 text-lg">
+              Descubre la revolución en validación de pedidos y automatización de procesos
+            </p>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
-                <BarChart3 className="w-8 h-8 text-primary" />
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-500/15 border border-emerald-500/30 rounded-full mb-4">
+                <BarChart3 className="w-8 h-8 text-emerald-400" />
               </div>
-              <p className="text-muted-foreground">
-                Experimenta la plataforma más avanzada para validación de clientes, integración con Shopify, chat automatizado y gestión de leads. Optimiza tu negocio con tecnología de vanguardia.
+              <p className="text-gray-400">
+                Experimenta la plataforma más avanzada para validación de clientes, integración con Shopify,
+                chat automatizado y gestión de leads. Optimiza tu negocio con tecnología de vanguardia.
               </p>
             </div>
-            
-            <div className="flex gap-4">
-              <Button 
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
                 onClick={() => setShowModal(false)}
-                className="flex-1 bg-primary hover:bg-primary/90 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 text-base font-semibold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all"
               >
-                🚀 Explorar Demo
+                <Sparkles className="w-4 h-4 mr-2" />
+                Explorar Demo
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   setShowModal(false);
                   setShowGuide(true);
                 }}
                 variant="outline"
-                className="flex-1 py-3 text-lg font-semibold transition-all duration-300"
+                className="flex-1 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 py-3 text-base font-semibold transition-all"
               >
-                📖 Guía Interactiva
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Guía Interactiva
               </Button>
             </div>
           </CardContent>
@@ -847,7 +623,12 @@ const InteractiveDemo = () => {
   // Vista principal del demo
   return (
     <DashboardLayout>
-      {renderMainContent()}
+      <DemoToolSelector
+        sections={navigationSections}
+        activeSection={activeSection}
+        onChange={(s) => setActiveSection(s)}
+      />
+      <div className="mt-4">{renderMainContent()}</div>
 
       {/* Botón flotante de navegación */}
       {!showModal && !showGuide && (
@@ -930,3 +711,91 @@ const InteractiveDemo = () => {
 };
 
 export default InteractiveDemo;
+
+// ============================================================================
+// Selector de herramientas — barra sticky con todas las tools disponibles
+// ============================================================================
+
+interface DemoToolSelectorProps {
+  sections: { title: string; section: string; icon: React.ComponentType<{ className?: string }> }[];
+  activeSection: string;
+  onChange: (section: string) => void;
+}
+
+const TOOLS_AVAILABLE = new Set([
+  'dashboard',
+  'crm',
+  'orders',
+  'order-validation',
+  'chat',
+  'leads',
+  'tracking',
+  'analytics',
+  'validation',
+  'studio-ia',
+  'settings',
+]);
+
+const DemoToolSelector: React.FC<DemoToolSelectorProps> = ({ sections, activeSection, onChange }) => {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll automático para mantener la herramienta activa visible
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const activeBtn = el.querySelector<HTMLElement>(`[data-section="${activeSection}"]`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [activeSection]);
+
+  return (
+    <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background/80 backdrop-blur-md border-b border-border/60">
+      <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground font-medium uppercase tracking-wide flex-shrink-0">
+          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+          Herramientas demo
+        </div>
+        <div
+          ref={scrollerRef}
+          className="flex items-center gap-2 overflow-x-auto scrollbar-thin pb-1 flex-1"
+          style={{ scrollBehavior: 'smooth' }}
+        >
+          {sections.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.section === activeSection;
+            const isAvailable = TOOLS_AVAILABLE.has(item.section);
+            return (
+              <button
+                key={item.section}
+                data-section={item.section}
+                onClick={() => onChange(item.section)}
+                className={cn(
+                  'group relative flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all border',
+                  isActive
+                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40 shadow-sm shadow-emerald-500/10'
+                    : 'bg-gray-900/40 text-gray-300 border-gray-800 hover:bg-gray-800/60 hover:border-gray-700 hover:text-white',
+                )}
+                title={item.title}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{item.title}</span>
+                {!isAvailable && (
+                  <span className="ml-1 text-[9px] text-amber-400/80 font-semibold uppercase tracking-wide">
+                    soon
+                  </span>
+                )}
+                {isActive && (
+                  <span className="ml-0.5 relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
