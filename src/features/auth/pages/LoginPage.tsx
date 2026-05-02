@@ -228,7 +228,7 @@ const LoginPage = () => {
                 <p className="text-sm text-muted-foreground">
                   ¿No tienes una cuenta?{' '}
                   <Link
-                    to="/register"
+                    to={{ pathname: '/', hash: 'pricing' }}
                     className="font-medium text-primary hover:text-primary/80 transition-colors duration-200"
                   >
                     Regístrate aquí

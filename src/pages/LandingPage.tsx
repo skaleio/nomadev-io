@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { getLandingContactWebhookUrl } from '@/lib/landing-contact-webhook';
 import { Button } from '@/components/ui/button';
@@ -363,6 +363,25 @@ const LandingPage = memo(() => {
       performScroll();
     }
   }, [isMobileMenuOpen]);
+
+  // Entrar con /#pricing (p. ej. desde login) y hacer scroll a la sección de planes
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || !hash.startsWith('#')) return;
+
+    const scroll = () => {
+      const element = document.querySelector(hash);
+      if (!element) return;
+      const headerOffset = 80;
+      const top = element.getBoundingClientRect().top + window.pageYOffset - headerOffset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    };
+
+    const id = window.requestAnimationFrame(() => {
+      scroll();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
   return (
     <>
