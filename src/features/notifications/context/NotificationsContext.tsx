@@ -177,8 +177,8 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(notification.title, {
         body: notification.message,
-        icon: '/favicon.svg',
-        badge: '/favicon.svg',
+        icon: '/favicon.png',
+        badge: '/favicon.png',
       });
     }
   };
