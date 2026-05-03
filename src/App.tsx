@@ -13,6 +13,7 @@ import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
 
 // MVP — carga inmediata (auth + dashboard + CRM + pedidos Dropi + ajustes)
 import LandingPage from "@/pages/LandingPage";
+import PricingPage from "@/pages/PricingPage";
 import Dashboard from "@/features/dashboard/pages/Dashboard";
 import LoginPage from "@/features/auth/pages/LoginPage";
 import RegisterPage from "@/features/auth/pages/RegisterPage";
@@ -84,6 +85,7 @@ const AppContent = () => {
           <Routes>
               {/* Rutas públicas */}
               <Route path="/" element={<LandingPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
               <Route path="/suscribirse" element={<SubscribePage />} />
               <Route path="/workflow" element={<WorkflowExamplePage />} />
               <Route path="/demo" element={<DemoPage />} />
