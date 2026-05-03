@@ -203,6 +203,10 @@ const ReviewCard = ({
   );
 };
 
+/** Checkout Mercado Pago — plan Starter ($25.000 CLP/mes, suscripción mensual). */
+const STARTER_SUBSCRIPTION_CHECKOUT_URL =
+  'https://www.mercadopago.cl/subscriptions/checkout?preapproval_plan_id=1d3a6f9806bd42d7a2bfff84646696f3';
+
 // Constantes para estilos reutilizables
 const STYLES = {
   container: "container mx-auto px-4",
@@ -1479,12 +1483,19 @@ const LandingPage = memo(() => {
                   </div>
                 </div>
                 
-                {/* CTA — formulario de suscripción; checkout (Stripe) después */}
-                <Link to="/suscribirse?plan=starter" className="block">
-                  <Button className="w-full bg-gray-800/80 hover:bg-gray-700/80 text-white border border-gray-700/50 hover:border-emerald-500/50 transition-all duration-300 py-4 text-lg font-semibold rounded-xl">
+                {/* CTA — checkout Mercado Pago (suscripción mensual) */}
+                <Button
+                  asChild
+                  className="w-full bg-gray-800/80 hover:bg-gray-700/80 text-white border border-gray-700/50 hover:border-emerald-500/50 transition-all duration-300 py-4 text-lg font-semibold rounded-xl"
+                >
+                  <a
+                    href={STARTER_SUBSCRIPTION_CHECKOUT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Suscribirse
-                  </Button>
-                </Link>
+                  </a>
+                </Button>
               </div>
             </div>
             
