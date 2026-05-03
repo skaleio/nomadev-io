@@ -7,6 +7,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/** Escape user-controlled strings before embedding in HTML to prevent XSS. */
+const escapeHtml = (s: unknown): string =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -44,7 +53,7 @@ serve(async (req) => {
         <body>
           <div class="container">
             <h1 class="error">Error de Conexión</h1>
-            <p>No se pudo conectar con Shopify: ${error}</p>
+            <p>No se pudo conectar con Shopify: ${escapeHtml(error)}</p>
             <button onclick="window.close()">Cerrar</button>
           </div>
         </body>
@@ -277,12 +286,12 @@ serve(async (req) => {
       <body>
         <div class="container">
           <h1 class="success">🎉 ¡Conexión Exitosa!</h1>
-          <p>Tu tienda <span class="shop-name">${shopInfo.name || shop}</span> se ha conectado correctamente a NOMADEV.</p>
+          <p>Tu tienda <span class="shop-name">${escapeHtml(shopInfo.name || shop)}</span> se ha conectado correctamente a NOMADEV.</p>
           <div class="spinner"></div>
           <p>Configurando tu dashboard... Serás redirigido automáticamente.</p>
           <script>
             setTimeout(() => {
-              window.location.href = '${redirectUrl}';
+              window.location.href = ${JSON.stringify(redirectUrl)};
             }, 3000);
           </script>
         </div>
@@ -310,7 +319,7 @@ serve(async (req) => {
       <body>
         <div class="container">
           <h1 class="error">Error del Servidor</h1>
-          <p>Ocurrió un error al procesar la conexión: ${error.message}</p>
+          <p>Ocurrió un error al procesar la conexión: ${escapeHtml((error as Error)?.message ?? 'Error desconocido')}</p>
           <button onclick="window.close()">Cerrar</button>
         </div>
       </body>

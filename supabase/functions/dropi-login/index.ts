@@ -6,9 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const WHITE_BRAND_ID =
-  Deno.env.get("DROPI_WHITE_BRAND_ID") ??
-  "df3e6b0bb66ceaadca4f84cbc371fd66e04d20fe51fc414da8d1b84d31d178de";
+const WHITE_BRAND_ID = Deno.env.get("DROPI_WHITE_BRAND_ID");
+if (!WHITE_BRAND_ID) {
+  console.error(
+    "dropi-login: DROPI_WHITE_BRAND_ID no está configurado. Configurá este secret en Supabase Edge Functions."
+  );
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -36,20 +39,46 @@ serve(async (req) => {
       );
     }
 
+    if (!WHITE_BRAND_ID) {
+      return new Response(
+        JSON.stringify({ error: "Configuración incompleta: DROPI_WHITE_BRAND_ID no está seteado." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const baseUrl = useTest
       ? "https://test-api.dropi.co"
       : "https://api.dropi.co";
     const loginUrl = `${baseUrl}/api/login`;
 
-    const response = await fetch(loginUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password,
-        white_brand_id: WHITE_BRAND_ID,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    let response: Response;
+    try {
+      response = await fetch(loginUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          white_brand_id: WHITE_BRAND_ID,
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      const isAbort = fetchErr instanceof DOMException && fetchErr.name === "AbortError";
+      return new Response(
+        JSON.stringify({
+          error: isAbort
+            ? "Dropi no respondió a tiempo. Intentá de nuevo."
+            : "No pudimos conectar con Dropi. Verificá tu conexión.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    clearTimeout(timeoutId);
 
     const data = await response.json().catch(() => ({}));
 

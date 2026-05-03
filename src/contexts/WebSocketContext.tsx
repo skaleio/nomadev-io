@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, ReactNode } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { useAuth } from './AuthContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
 
 interface WebSocketContextType {
   isConnected: boolean;

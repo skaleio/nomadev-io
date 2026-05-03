@@ -92,6 +92,7 @@ serve(async (req) => {
 
     const authHeader = { Authorization: `Bearer ${token}` };
     const base = baseUrl.replace(/\/$/, "");
+    const FETCH_TIMEOUT_MS = 20000;
 
     const doFetch = async (
       method: string,
@@ -103,11 +104,18 @@ serve(async (req) => {
         const q = new URLSearchParams(opts.query);
         url += `?${q.toString()}`;
       }
-      return fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", ...authHeader },
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      try {
+        return await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json", ...authHeader },
+          body: opts.body ? JSON.stringify(opts.body) : undefined,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
     };
 
     let res: Response;
@@ -226,11 +234,18 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    const isAbort = err instanceof DOMException && err.name === "AbortError";
     console.error("dropi-api error:", err);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : "Error de servidor" }),
+      JSON.stringify({
+        error: isAbort
+          ? "Dropi no respondió a tiempo. Intentá nuevamente."
+          : err instanceof Error
+          ? err.message
+          : "Error de servidor",
+      }),
       {
-        status: 500,
+        status: isAbort ? 504 : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

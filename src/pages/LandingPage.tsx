@@ -1,15 +1,17 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, memo, useEffect } from 'react';
+import { toast } from 'sonner';
+import { getLandingContactWebhookUrl } from '@/lib/landing-contact-webhook';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Globe } from '@/components/ui/globe';
+import { Globe } from '@/components/effects/globe';
 import { AvatarGroup, AvatarGroupTooltip } from '@/components/ui/avatar-group';
-import RippleGrid from '@/components/RippleGrid';
-import { HeroVideoDialog } from '@/components/ui/hero-video-dialog';
-import { CustomCursor } from '@/components/ui/custom-cursor';
-import { Marquee } from '@/components/ui/marquee';
+import RippleGrid from '@/components/effects/RippleGrid';
+import { Marquee } from '@/components/effects/marquee';
+import { SupportContactDialog } from '@/features/landing/SupportContactDialog';
+import { LandingPricingPlans } from '@/components/landing/LandingPricingPlans';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
@@ -34,6 +36,7 @@ import {
   Linkedin,
   Menu,
   X,
+  Loader2,
 } from 'lucide-react';
 
 
@@ -222,6 +225,24 @@ const LandingPage = memo(() => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
+  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
+  const [demoLeadForm, setDemoLeadForm] = useState({
+    fullName: '',
+    email: '',
+    company: '',
+    phone: '',
+  });
+  const [demoLeadSubmitting, setDemoLeadSubmitting] = useState(false);
+
+  const openSupportDialog = useCallback(() => {
+    const wasMobileMenu = isMobileMenuOpen;
+    if (wasMobileMenu) {
+      setIsMobileMenuOpen(false);
+      setTimeout(() => setSupportDialogOpen(true), 280);
+    } else {
+      setSupportDialogOpen(true);
+    }
+  }, [isMobileMenuOpen]);
 
   // Configuración personalizada del Globe
   const GLOBE_CONFIG = {
@@ -260,6 +281,55 @@ const LandingPage = memo(() => {
     setOpenFAQ(prev => prev === index ? null : index);
   }, []);
 
+  const handleDemoLeadSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (demoLeadSubmitting) return;
+
+    if (!demoLeadForm.fullName.trim() || !demoLeadForm.email.trim()) {
+      toast.error('Nombre y email son obligatorios');
+      return;
+    }
+
+    const webhookUrl = getLandingContactWebhookUrl();
+    if (!webhookUrl) {
+      toast.error('No hay endpoint configurado', {
+        description: 'Definí VITE_LANDING_SUPPORT_WEBHOOK_URL o VITE_DEMO_CONTACT_WEBHOOK_URL en tu .env',
+      });
+      return;
+    }
+
+    try {
+      setDemoLeadSubmitting(true);
+      const payload = {
+        ...demoLeadForm,
+        source: 'landing-solicitar-demo',
+        page: typeof window !== 'undefined' ? window.location.pathname : null,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        submittedAt: new Date().toISOString(),
+      };
+
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      toast.success('¡Listo!', {
+        description: 'Recibimos tu solicitud de demo. Te contactamos pronto.',
+      });
+      setDemoLeadForm({ fullName: '', email: '', company: '', phone: '' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error('No pudimos enviar el formulario', { description: message });
+    } finally {
+      setDemoLeadSubmitting(false);
+    }
+  }, [demoLeadForm, demoLeadSubmitting]);
+
   // Función para scroll suave a las secciones
   const scrollToSection = useCallback((e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
     e.preventDefault();
@@ -293,8 +363,27 @@ const LandingPage = memo(() => {
     }
   }, [isMobileMenuOpen]);
 
+  // Entrar con hash (p. ej. /#features) y hacer scroll a la sección correspondiente
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || !hash.startsWith('#')) return;
+
+    const scroll = () => {
+      const element = document.querySelector(hash);
+      if (!element) return;
+      const headerOffset = 80;
+      const top = element.getBoundingClientRect().top + window.pageYOffset - headerOffset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    };
+
+    const id = window.requestAnimationFrame(() => {
+      scroll();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
+
   return (
-    <CustomCursor>
+    <>
       <div className="landing-page min-h-screen transition-colors duration-300 bg-black m-0 p-0" style={{ margin: '0', padding: '0', marginTop: '0', paddingTop: '0' }}>
       {/* Header */}
       <header className="border-b backdrop-blur-md sticky top-0 z-50 shadow-lg transition-colors duration-300 border-gray-800 bg-black/90 m-0 p-0" style={{ marginTop: '0', paddingTop: '0', top: '0', transform: 'translateY(0)', position: 'sticky' }}>
@@ -330,15 +419,12 @@ const LandingPage = memo(() => {
               >
                 Productos
               </a>
-              <a 
-                href="#pricing" 
-                onClick={(e) => scrollToSection(e, '#pricing')}
-                className={`transition-colors font-medium cursor-pointer ${
-                  'text-gray-300 hover:text-emerald-400'
-                }`}
+              <Link
+                to="/pricing"
+                className="transition-colors font-medium cursor-pointer text-gray-300 hover:text-emerald-400"
               >
                 Precios
-              </a>
+              </Link>
               <a 
                 href="#integrations" 
                 onClick={(e) => scrollToSection(e, '#integrations')}
@@ -366,29 +452,23 @@ const LandingPage = memo(() => {
               >
                 Recursos
               </a>
-              <a 
-                href="#support" 
-                onClick={(e) => scrollToSection(e, '#support')}
-                className={`transition-colors font-medium cursor-pointer ${
-                  'text-gray-300 hover:text-emerald-400'
-                }`}
+              <button
+                type="button"
+                onClick={openSupportDialog}
+                className="transition-colors font-medium cursor-pointer text-gray-300 hover:text-emerald-400 bg-transparent border-0 p-0"
               >
                 Soporte
-              </a>
+              </button>
             </nav>
             
-            {/* Desktop Actions */}
+            {/* Desktop: sin login/registro público — acceso tras suscripción */}
             <div className="flex items-center space-x-4">
-              <Link to="/login">
-                <Button variant="ghost" className="transition-colors text-gray-300 hover:text-white hover:bg-gray-700">
-                  Iniciar Sesión
-                </Button>
-              </Link>
-              <Link to="/register">
-                <Button className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg">
-                  Comenzar Gratis
-                </Button>
-              </Link>
+              <Button
+                asChild
+                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg"
+              >
+                <Link to="/pricing">Ver planes</Link>
+              </Button>
             </div>
           </div>
 
@@ -443,14 +523,14 @@ const LandingPage = memo(() => {
                 <span className="text-base">Productos</span>
                 <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </a>
-              <a 
-                href="#pricing" 
-                onClick={(e) => scrollToSection(e, '#pricing')}
+              <Link
+                to="/pricing"
+                onClick={() => setIsMobileMenuOpen(false)}
                 className="py-4 px-5 rounded-xl font-medium transition-all duration-300 flex items-center justify-between group cursor-pointer text-gray-300 hover:text-emerald-400 hover:bg-gray-800/60"
               >
                 <span className="text-base">Precios</span>
                 <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </a>
+              </Link>
               <a 
                 href="#integrations" 
                 onClick={(e) => scrollToSection(e, '#integrations')}
@@ -475,33 +555,24 @@ const LandingPage = memo(() => {
                 <span className="text-base">Recursos</span>
                 <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </a>
-              <a 
-                href="#support" 
-                onClick={(e) => scrollToSection(e, '#support')}
-                className="py-4 px-5 rounded-xl font-medium transition-all duration-300 flex items-center justify-between group cursor-pointer text-gray-300 hover:text-emerald-400 hover:bg-gray-800/60"
+              <button
+                type="button"
+                onClick={openSupportDialog}
+                className="py-4 px-5 rounded-xl font-medium transition-all duration-300 flex items-center justify-between group cursor-pointer text-gray-300 hover:text-emerald-400 hover:bg-gray-800/60 w-full text-left border-0 bg-transparent"
               >
                 <span className="text-base">Soporte</span>
                 <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </a>
+              </button>
               
               <div className="pt-6 mt-4 border-t border-gray-600/30 flex flex-col space-y-3">
-                <Link to="/login">
-                  <Button 
-                    onClick={toggleMobileMenu}
-                    variant="ghost" 
-                    className="w-full py-6 text-base font-medium rounded-xl text-gray-300 hover:text-white hover:bg-gray-800"
-                  >
-                    Iniciar Sesión
-                  </Button>
-                </Link>
-                <Link to="/register">
-                  <Button 
-                    onClick={toggleMobileMenu}
-                    className="w-full py-6 text-base font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
-                  >
-                    Comenzar Gratis
-                  </Button>
-                </Link>
+                <Button
+                  asChild
+                  className="w-full py-6 text-base font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+                >
+                  <Link to="/pricing" onClick={() => setIsMobileMenuOpen(false)}>
+                    Ver planes
+                  </Link>
+                </Button>
               </div>
             </nav>
           </div>
@@ -539,12 +610,16 @@ const LandingPage = memo(() => {
             <strong className="text-white">La solución:</strong> Valida automáticamente cada pedido por WhatsApp antes del envío.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register">
-              <Button size="lg" className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-lg px-8 py-6 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300">
-                Comenzar Gratis
+            <Button
+              size="lg"
+              asChild
+              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-lg px-8 py-6 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-300"
+            >
+              <Link to="/pricing">
+                Ver planes
                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <Link to="/interactive-demo">
               <Button size="lg" className="text-lg px-8 py-6 transition-all duration-200 shadow-lg hover:shadow-xl bg-emerald-600 text-white hover:bg-emerald-700 border-0">
                 <Play className="mr-2 h-5 w-5" />
@@ -1145,32 +1220,19 @@ const LandingPage = memo(() => {
         </div>
       </section>
 
-      {/* Video & Contact Form Section */}
+      {/* Demo / contact form */}
       <section className={STYLES.section}>
         <div className={STYLES.container}>
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-white mb-4">
-              Ve NOMADEV.IO en Acción
+              Solicita una demostración
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Descubre cómo funciona nuestro sistema y solicita una demostración personalizada
+              Cuéntanos sobre tu negocio y te contactamos para una demo personalizada
             </p>
           </div>
-          
-          <div className="grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
-            {/* Video Section - HeroVideoDialog */}
-            <div className="space-y-6">
-              <HeroVideoDialog
-                className="w-full"
-                animationStyle="from-center"
-                videoSrc="https://www.example.com/dummy-video"
-                thumbnailSrc="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=450&fit=crop&crop=center"
-                thumbnailAlt="NOMADEV.IO Demo Video"
-              />
-            </div>
 
-            {/* Contact Form Section */}
-            <div className="space-y-6">
+          <div className="max-w-xl mx-auto space-y-6">
               <Card className="shadow-2xl border-0 bg-black backdrop-blur-sm relative overflow-hidden border border-gray-800">
                 {/* Decorative background elements */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full -translate-y-16 translate-x-16"></div>
@@ -1186,15 +1248,22 @@ const LandingPage = memo(() => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-8 relative z-10">
-                  <form className="space-y-6">
+                  <form className="space-y-6" onSubmit={handleDemoLeadSubmit}>
                     <div className="space-y-6">
                       {/* Nombre */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-fullName" className="block text-sm font-medium text-gray-300">
                           Nombre completo
                         </label>
                         <input
+                          id="demo-lead-fullName"
+                          name="fullName"
                           type="text"
+                          autoComplete="name"
+                          value={demoLeadForm.fullName}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, fullName: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="Juan Pérez"
                         />
@@ -1202,11 +1271,18 @@ const LandingPage = memo(() => {
 
                       {/* Email */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-email" className="block text-sm font-medium text-gray-300">
                           Correo electrónico
                         </label>
                         <input
+                          id="demo-lead-email"
+                          name="email"
                           type="email"
+                          autoComplete="email"
+                          value={demoLeadForm.email}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, email: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="juan@empresa.com"
                         />
@@ -1214,11 +1290,18 @@ const LandingPage = memo(() => {
 
                       {/* Empresa */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-company" className="block text-sm font-medium text-gray-300">
                           Empresa
                         </label>
                         <input
+                          id="demo-lead-company"
+                          name="company"
                           type="text"
+                          autoComplete="organization"
+                          value={demoLeadForm.company}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, company: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="Mi Tienda Online"
                         />
@@ -1226,11 +1309,18 @@ const LandingPage = memo(() => {
 
                       {/* WhatsApp */}
                       <div className="space-y-2">
-                        <label className="block text-sm font-medium text-gray-300">
+                        <label htmlFor="demo-lead-phone" className="block text-sm font-medium text-gray-300">
                           Número de WhatsApp
                         </label>
                         <input
+                          id="demo-lead-phone"
+                          name="phone"
                           type="tel"
+                          autoComplete="tel"
+                          value={demoLeadForm.phone}
+                          onChange={(ev) =>
+                            setDemoLeadForm((prev) => ({ ...prev, phone: ev.target.value }))
+                          }
                           className="w-full px-4 py-3 bg-transparent border border-gray-700 rounded-lg focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all duration-200 text-white placeholder-gray-500"
                           placeholder="+56948576839"
                         />
@@ -1241,9 +1331,17 @@ const LandingPage = memo(() => {
                     <div className="pt-4">
                       <Button 
                         type="submit" 
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-colors duration-200"
+                        disabled={demoLeadSubmitting}
+                        className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-lg font-medium transition-colors duration-200 disabled:opacity-70"
                       >
-                        Solicitar Demo
+                        {demoLeadSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                            Enviando…
+                          </>
+                        ) : (
+                          'Solicitar Demo'
+                        )}
                       </Button>
                     </div>
                   </form>
@@ -1262,266 +1360,16 @@ const LandingPage = memo(() => {
                 </div>
                 <div className="text-center p-4 bg-black/80 rounded-lg backdrop-blur-sm border border-gray-800">
                   <div className="text-lg font-bold text-emerald-600 mb-1">100%</div>
-                  <div className="text-sm text-gray-300">Gratis y sin compromiso</div>
+                  <div className="text-sm text-gray-300">Agenda sin compromiso</div>
                 </div>
               </div>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Pricing Section - Professional Corporate Design */}
-      <section id="pricing" className="py-24 bg-black relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-20 left-10 w-32 h-32 bg-emerald-400 rounded-full blur-3xl"></div>
-          <div className="absolute top-40 right-20 w-24 h-24 bg-cyan-400 rounded-full blur-2xl"></div>
-          <div className="absolute bottom-20 left-1/3 w-28 h-28 bg-violet-400 rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className={`${STYLES.container} relative z-10`}>
-          <div className="text-center mb-20">
-            <Badge className="mb-6 bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30">
-              Planes Empresariales
-            </Badge>
-            <h2 className="text-5xl md:text-6xl font-bold text-white mb-6 tracking-tight">
-              Soluciones que Escalan
-            </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-              Desde startups hasta corporaciones, tenemos el plan perfecto para automatizar 
-              y optimizar tu negocio de e-commerce
-            </p>
-          </div>
-          
-          <div className="grid lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
-            {/* Starter Plan */}
-            <div className="group relative bg-black border border-white/10 rounded-3xl p-10 hover:bg-black hover:border-emerald-500/30 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-emerald-500/10">
-              {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 via-transparent to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              
-              {/* Plan Badge */}
-              <div className="absolute -top-3 left-8">
-                <div className="bg-gray-800/90 backdrop-blur-sm border border-gray-700/50 rounded-full px-4 py-1">
-                  <span className="text-sm font-medium text-gray-300">BÁSICO</span>
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="relative z-10">
-                {/* Header */}
-                <div className="text-center mb-10">
-                  <h3 className="text-3xl font-bold text-white mb-3 tracking-tight">Starter</h3>
-                  <p className="text-gray-400 text-lg leading-relaxed">
-                    Ideal para emprendedores y pequeñas empresas
-                  </p>
-                </div>
-                
-                {/* Pricing */}
-                <div className="text-center mb-10">
-                  <div className="flex items-baseline justify-center">
-                    <span className="text-6xl font-bold text-white">$49</span>
-                    <span className="text-xl text-gray-400 ml-2">/mes</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">Facturación mensual</p>
-                </div>
-                
-                {/* Features */}
-                <div className="space-y-5 mb-10">
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Hasta 1,000 mensajes WhatsApp/mes</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">1 tienda Shopify conectada</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Soporte técnico por email</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Dashboard básico de analytics</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Setup guiado en 5 minutos</span>
-                  </div>
-                </div>
-                
-                {/* CTA */}
-                <Button className="w-full bg-gray-800/80 hover:bg-gray-700/80 text-white border border-gray-700/50 hover:border-emerald-500/50 transition-all duration-300 py-4 text-lg font-semibold rounded-xl">
-                  Comenzar Gratis
-                </Button>
-              </div>
-            </div>
-            
-            {/* Professional Plan - Featured */}
-            <div className="group relative bg-black border-2 border-emerald-500/50 rounded-3xl p-10 hover:bg-black hover:border-emerald-400 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-emerald-500/20 scale-105">
-              {/* Popular badge */}
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-20">
-                <Badge className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-6 py-2 shadow-xl text-sm font-semibold">
-                  MÁS POPULAR
-                </Badge>
-              </div>
-              
-              {/* Enhanced gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-emerald-600/5 to-transparent rounded-3xl"></div>
-              
-              {/* Content */}
-              <div className="relative z-10">
-                {/* Header */}
-                <div className="text-center mb-10">
-                  <h3 className="text-3xl font-bold text-white mb-3 tracking-tight">Professional</h3>
-                  <p className="text-gray-400 text-lg leading-relaxed">
-                    Para negocios en crecimiento y equipos medianos
-                  </p>
-                </div>
-                
-                {/* Pricing */}
-                <div className="text-center mb-10">
-                  <div className="flex items-baseline justify-center">
-                    <span className="text-6xl font-bold text-white">$99</span>
-                    <span className="text-xl text-gray-400 ml-2">/mes</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">Facturación mensual</p>
-                </div>
-                
-                {/* Features */}
-                <div className="space-y-5 mb-10">
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/30 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-300" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Hasta 5,000 mensajes WhatsApp/mes</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/30 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-300" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Hasta 5 tiendas Shopify</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/30 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-300" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Soporte prioritario 24/7</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/30 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-300" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Analytics avanzados y reportes</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-emerald-500/30 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-emerald-300" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Automatizaciones personalizadas</span>
-                  </div>
-                </div>
-                
-                {/* CTA */}
-                <Button className="w-full bg-white hover:bg-gray-100 text-black font-bold transition-all duration-300 py-4 text-lg rounded-xl shadow-xl">
-                  Comenzar Prueba
-                </Button>
-              </div>
-            </div>
-            
-            {/* Enterprise Plan */}
-            <div className="group relative bg-black border border-white/10 rounded-3xl p-10 hover:bg-black hover:border-violet-500/30 transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:shadow-violet-500/10">
-              {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-transparent rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              
-              {/* Plan Badge */}
-              <div className="absolute -top-3 left-8">
-                <div className="bg-gray-800/90 backdrop-blur-sm border border-gray-700/50 rounded-full px-4 py-1">
-                  <span className="text-sm font-medium text-gray-300">ENTERPRISE</span>
-                </div>
-              </div>
-              
-              {/* Content */}
-              <div className="relative z-10">
-                {/* Header */}
-                <div className="text-center mb-10">
-                  <h3 className="text-3xl font-bold text-white mb-3 tracking-tight">Enterprise</h3>
-                  <p className="text-gray-400 text-lg leading-relaxed">
-                    Para grandes corporaciones y equipos globales
-                  </p>
-                </div>
-                
-                {/* Pricing */}
-                <div className="text-center mb-10">
-                  <div className="flex items-baseline justify-center">
-                    <span className="text-6xl font-bold text-white">$189</span>
-                    <span className="text-xl text-gray-400 ml-2">/mes</span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-2">Facturación mensual</p>
-                </div>
-                
-                {/* Features */}
-                <div className="space-y-5 mb-10">
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-violet-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-violet-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Mensajes WhatsApp ilimitados</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-violet-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-violet-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Tiendas Shopify ilimitadas</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-violet-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-violet-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Soporte 24/7 con gerente dedicado</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-violet-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-violet-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">API personalizada y webhooks</span>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="w-6 h-6 bg-violet-500/20 rounded-full flex items-center justify-center mr-4 mt-0.5 flex-shrink-0">
-                      <CheckCircle className="h-4 w-4 text-violet-400" />
-                    </div>
-                    <span className="text-gray-300 leading-relaxed">Integraciones personalizadas</span>
-                  </div>
-                </div>
-                
-                {/* CTA */}
-                <Button className="w-full bg-gray-800/80 hover:bg-gray-700/80 text-white border border-gray-700/50 hover:border-violet-500/50 transition-all duration-300 py-4 text-lg font-semibold rounded-xl">
-                  Contactar Ventas
-                </Button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Bottom CTA */}
-          <div className="text-center mt-16">
-            <p className="text-gray-400 mb-6">¿Necesitas un plan personalizado?</p>
-            <Button variant="outline" className="border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10 hover:border-emerald-400/70 transition-all duration-300 px-8 py-3">
-              Hablar con un Experto
-            </Button>
-          </div>
-        </div>
-      </section>
+      <LandingPricingPlans sectionId="pricing" />
 
-      {/* FAQ Section - Moved after video and form */}
+      {/* FAQ Section */}
       <section className={STYLES.section}>
         <div className={STYLES.container}>
           <div className="text-center mb-16">
@@ -1656,18 +1504,22 @@ const LandingPage = memo(() => {
               ¿Listo para Reducir tus Devoluciones un 85%?
             </h2>
             <p className="text-xl mb-10 text-white/90 max-w-2xl mx-auto leading-relaxed">
-              Únete a más de <strong>500 empresas exitosas</strong> que ya usan NOMADEV.IO para validar pedidos automáticamente. 
-              Sin tarjeta de crédito. Sin contratos. Empieza gratis en 5 minutos.
+              Únete a más de <strong>500 empresas exitosas</strong> que ya usan NOMADEV.IO para validar pedidos automáticamente.
+              El acceso a la plataforma es por <strong>suscripción mensual</strong>; elige tu plan y activa tu cuenta.
             </p>
             
             {/* CTAs principales */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Link to="/register">
-                <Button size="lg" className="bg-emerald-600 text-white hover:bg-emerald-700 text-lg px-12 py-7 shadow-2xl hover:shadow-emerald-500/20 transform hover:scale-105 transition-all duration-300 font-bold">
-                  Comenzar Gratis
+              <Button
+                size="lg"
+                asChild
+                className="bg-emerald-600 text-white hover:bg-emerald-700 text-lg px-12 py-7 shadow-2xl hover:shadow-emerald-500/20 transform hover:scale-105 transition-all duration-300 font-bold"
+              >
+                <Link to="/pricing">
+                  Ver planes
                   <ArrowRight className="ml-2 h-6 w-6" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
               <Link to="/interactive-demo">
                 <Button size="lg" variant="outline" className="bg-transparent border-2 border-emerald-500 text-emerald-300 hover:bg-emerald-500/10 text-lg px-12 py-7 shadow-xl">
                   <Play className="mr-2 h-5 w-5" />
@@ -1680,15 +1532,15 @@ const LandingPage = memo(() => {
             <div className="flex flex-wrap justify-center items-center gap-6 text-white/90 text-sm">
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-white" />
-                <span>Sin tarjeta de crédito</span>
+                <span>Facturación mensual clara</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-white" />
-                <span>Cancela cuando quieras</span>
+                <span>Gestiona tu suscripción cuando quieras</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-white" />
-                <span>Setup en 5 minutos</span>
+                <span>Onboarding guiado</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="h-5 w-5 text-white" />
@@ -1733,7 +1585,11 @@ const LandingPage = memo(() => {
               <h3 className="text-lg font-semibold mb-4">Producto</h3>
               <ul className="space-y-3">
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Características</a></li>
-                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Precios</a></li>
+                <li>
+                  <Link to="/pricing" className="text-gray-400 hover:text-white transition-colors">
+                    Precios
+                  </Link>
+                </li>
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Integraciones</a></li>
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">API</a></li>
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Changelog</a></li>
@@ -1768,7 +1624,8 @@ const LandingPage = memo(() => {
         </div>
       </footer>
       </div>
-    </CustomCursor>
+      <SupportContactDialog open={supportDialogOpen} onOpenChange={setSupportDialogOpen} />
+    </>
   );
 });
 

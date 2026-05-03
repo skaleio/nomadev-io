@@ -1,97 +1,100 @@
+import { lazy, Suspense } from "react";
 import { HeroUIProvider } from "@heroui/react";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { CustomCursor } from "@/components/ui/custom-cursor";
+import { CustomCursor } from "@/components/effects/custom-cursor";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { WebSocketProvider } from "./contexts/WebSocketContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { NotificationsProvider } from "./contexts/NotificationsContext";
-import { LoadingScreen } from "./components/ui/loading-logo";
-// import { SimpleCommandPalette } from "./components/ui/simple-command-palette";
-// import { useSimpleCommandPalette } from "./hooks/useSimpleCommandPalette";
-// import { setupApiInterceptors } from "./lib/api"; // Removed - no longer needed
-import ProtectedRoute from "./components/ProtectedRoute";
-import LandingPage from "./pages/LandingPage";
-import Dashboard from "./pages/Dashboard";
-import LoginPage from "./pages/LoginPage";
-import { WorkflowExample } from "./components/workflow/WorkflowExample";
-import RegisterPage from "./pages/RegisterPage";
-import ValidationPage from "./pages/ValidationPage";
-import ChatPage from "./pages/ChatPage";
-import LeadsPage from "./pages/LeadsPage";
-import ShopifyPage from "./pages/ShopifyPage";
-import SettingsPage from "./pages/SettingsPage";
-import ProfilePage from "./pages/ProfilePage";
-import BillingPage from "./pages/BillingPage";
-import KeyboardShortcutsPage from "./pages/KeyboardShortcutsPage";
-import TeamIndexPage from "./pages/TeamIndexPage";
-import TeamNewPage from "./pages/TeamNewPage";
-import TeamInvitePage from "./pages/TeamInvitePage";
-import ShopifyConnectPage from "./pages/ShopifyConnectPage";
-import DropiPage from "./pages/DropiPage";
-import DropiConnectPage from "./pages/DropiConnectPage";
-import AuthSuccessPage from "./pages/AuthSuccessPage";
-import OrderValidationPage from "./pages/OrderValidationPage";
-import OrdersPage from "./pages/OrdersPage";
-import TrackingPage from "./pages/TrackingPage";
-import CRMPage from "./pages/CRMPage";
-import StudioIAPage from "./pages/StudioIAPage";
-import ProductImageGeneratorPage from "./pages/ProductImageGeneratorPage";
-import CopywritingPage from "./pages/CopywritingPage";
-import LogoGeneratorPage from "./pages/LogoGeneratorPage";
-import AgentBuilderPage from "./pages/AgentBuilderPage";
-import AgentHubPage from "./pages/AgentHubPage";
-import WhatsAppIntegrationPage from "./pages/WhatsAppIntegrationPage";
-import PriceOptimizerPage from "./pages/PriceOptimizerPage";
-import BrandIdentityPage from "./pages/BrandIdentityPage";
-import WebsiteBuilderPage from "./pages/WebsiteBuilderPage";
-import DemoPage from "./pages/DemoPage";
-import InteractiveDemo from "./pages/InteractiveDemo";
-import ValidationDemo from "./pages/ValidationDemo";
-import ShopifyDemo from "./pages/ShopifyDemo";
-import ChatDemo from "./pages/ChatDemo";
-import OrdersDemo from "./pages/OrdersDemo";
-import TrackingDemo from "./pages/TrackingDemo";
-import LeadsDemo from "./pages/LeadsDemo";
-import SettingsDemo from "./pages/SettingsDemo";
-import StudioIADemo from "./pages/StudioIADemo";
-import CRMDemo from "./pages/CRMDemo";
-import ScheduleDemoPage from "./pages/ScheduleDemoPage";
-import OnboardingPage from "./pages/OnboardingPage";
-import { EmailVerificationPage } from "./pages/EmailVerificationPage";
-import NotFound from "./pages/NotFound";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
+import { WebSocketProvider } from "@/contexts/WebSocketContext";
+import { ThemeProvider } from "@/theme/ThemeContext";
+import { NotificationsProvider } from "@/features/notifications/context/NotificationsContext";
+import ProtectedRoute from "@/features/auth/components/ProtectedRoute";
+
+// MVP — carga inmediata (auth + dashboard + CRM + pedidos Dropi + ajustes)
+import LandingPage from "@/pages/LandingPage";
+import PricingPage from "@/pages/PricingPage";
+import Dashboard from "@/features/dashboard/pages/Dashboard";
+import LoginPage from "@/features/auth/pages/LoginPage";
+import RegisterPage from "@/features/auth/pages/RegisterPage";
+import { EmailVerificationPage } from "@/features/auth/pages/EmailVerificationPage";
+import AuthSuccessPage from "@/features/auth/pages/AuthSuccessPage";
+import OnboardingPage from "@/features/onboarding/pages/OnboardingPage";
+import OrdersPage from "@/features/orders/pages/OrdersPage";
+import CRMPage from "@/features/crm/pages/CRMPage";
+import DropiPage from "@/features/dropi/pages/DropiPage";
+import DropiConnectPage from "@/features/dropi/pages/DropiConnectPage";
+import ProfilePage from "@/features/profile/pages/ProfilePage";
+import SettingsPage from "@/features/settings/pages/SettingsPage";
+import NotFound from "@/pages/NotFound";
+import SubscribePage from "@/pages/SubscribePage";
+
+// Post-MVP — lazy
+const WorkflowExamplePage = lazy(() =>
+  import("@/features/workflow/components/WorkflowExample").then((m) => ({ default: m.WorkflowExample })),
+);
+const ValidationPage = lazy(() => import("@/features/orders/pages/ValidationPage"));
+const ChatPage = lazy(() => import("@/features/chat/pages/ChatPage"));
+const LeadsPage = lazy(() => import("@/features/crm/pages/LeadsPage"));
+const ShopifyPage = lazy(() => import("@/features/shopify/pages/ShopifyPage"));
+const ShopifyConnectPage = lazy(() => import("@/features/shopify/pages/ShopifyConnectPage"));
+const BillingPage = lazy(() => import("@/features/billing/pages/BillingPage"));
+const KeyboardShortcutsPage = lazy(() => import("@/pages/KeyboardShortcutsPage"));
+const TeamIndexPage = lazy(() => import("@/features/team/pages/TeamIndexPage"));
+const TeamNewPage = lazy(() => import("@/features/team/pages/TeamNewPage"));
+const TeamInvitePage = lazy(() => import("@/features/team/pages/TeamInvitePage"));
+const OrderValidationPage = lazy(() => import("@/features/orders/pages/OrderValidationPage"));
+const TrackingPage = lazy(() => import("@/features/orders/pages/TrackingPage"));
+const StudioIAPage = lazy(() => import("@/features/studio-ia/pages/StudioIAPage"));
+const ProductImageGeneratorPage = lazy(() => import("@/features/studio-ia/pages/ProductImageGeneratorPage"));
+const CopywritingPage = lazy(() => import("@/features/studio-ia/pages/CopywritingPage"));
+const LogoGeneratorPage = lazy(() => import("@/features/studio-ia/pages/LogoGeneratorPage"));
+const AgentBuilderPage = lazy(() => import("@/features/workflow/pages/AgentBuilderPage"));
+const AgentHubPage = lazy(() => import("@/features/agents/pages/AgentHubPage"));
+const WhatsAppIntegrationPage = lazy(() => import("@/features/whatsapp/pages/WhatsAppIntegrationPage"));
+const PriceOptimizerPage = lazy(() => import("@/features/studio-ia/pages/PriceOptimizerPage"));
+const BrandIdentityPage = lazy(() => import("@/features/studio-ia/pages/BrandIdentityPage"));
+const WebsiteBuilderPage = lazy(() => import("@/features/studio-ia/pages/WebsiteBuilderPage"));
+
+// Demos — lazy (mocks internos)
+const DemoPage = lazy(() => import("@/pages/demo/DemoPage"));
+const InteractiveDemo = lazy(() => import("@/pages/demo/InteractiveDemo"));
+const ValidationDemo = lazy(() => import("@/pages/demo/ValidationDemo"));
+const ShopifyDemo = lazy(() => import("@/pages/demo/ShopifyDemo"));
+const ChatDemo = lazy(() => import("@/pages/demo/ChatDemo"));
+const OrdersDemo = lazy(() => import("@/pages/demo/OrdersDemo"));
+const OrderValidationDemo = lazy(() => import("@/pages/demo/OrderValidationDemo"));
+const TrackingDemo = lazy(() => import("@/pages/demo/TrackingDemo"));
+const LeadsDemo = lazy(() => import("@/pages/demo/LeadsDemo"));
+const SettingsDemo = lazy(() => import("@/pages/demo/SettingsDemo"));
+const StudioIADemo = lazy(() => import("@/pages/demo/StudioIADemo"));
+const CRMDemo = lazy(() => import("@/pages/demo/CRMDemo"));
+const ScheduleDemoPage = lazy(() => import("@/pages/demo/ScheduleDemoPage"));
 
 const queryClient = new QueryClient();
 
-// Configuración de API manejada por Supabase directamente
-
-// Componente interno que muestra loading mientras Auth carga
+// AppContent NO bloquea por isLoading: las rutas públicas renderizan al instante
+// y ProtectedRoute muestra su propio loader solo cuando hace falta.
 const AppContent = () => {
-  const { isLoading } = useAuth();
-
-  if (isLoading) {
-    return <LoadingScreen message="Cargando aplicación..." />;
-  }
-
   return (
     <>
-      <Toaster />
       <Sonner />
-      
+
       <BrowserRouter>
-        <Routes>
+        <Suspense fallback={<div className="min-h-screen bg-background" />}>
+          <Routes>
               {/* Rutas públicas */}
               <Route path="/" element={<LandingPage />} />
-              <Route path="/workflow" element={<WorkflowExample />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/suscribirse" element={<SubscribePage />} />
+              <Route path="/workflow" element={<WorkflowExamplePage />} />
               <Route path="/demo" element={<DemoPage />} />
               <Route path="/interactive-demo" element={<InteractiveDemo />} />
               <Route path="/validation-demo" element={<ValidationDemo />} />
               <Route path="/shopify-demo" element={<ShopifyDemo />} />
               <Route path="/chat-demo" element={<ChatDemo />} />
               <Route path="/orders-demo" element={<OrdersDemo />} />
+              <Route path="/order-validation-demo" element={<OrderValidationDemo />} />
               <Route path="/tracking-demo" element={<TrackingDemo />} />
               <Route path="/leads-demo" element={<LeadsDemo />} />
               <Route path="/settings-demo" element={<SettingsDemo />} />
@@ -102,10 +105,10 @@ const AppContent = () => {
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/verify-email" element={<EmailVerificationPage />} />
               <Route path="/auth/success" element={<AuthSuccessPage />} />
-              
+
               {/* Onboarding */}
               <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-              
+
               {/* Rutas protegidas */}
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/validation" element={<ProtectedRoute><ValidationPage /></ProtectedRoute>} />
@@ -136,10 +139,11 @@ const AppContent = () => {
                        <Route path="/team" element={<ProtectedRoute><TeamIndexPage /></ProtectedRoute>} />
                        <Route path="/team/new" element={<ProtectedRoute><TeamNewPage /></ProtectedRoute>} />
                        <Route path="/team/invite/:channel" element={<ProtectedRoute><TeamInvitePage /></ProtectedRoute>} />
-              
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </>
   );
