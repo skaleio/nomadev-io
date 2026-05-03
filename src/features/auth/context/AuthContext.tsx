@@ -88,7 +88,6 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
   register: (userData: {
     email: string;
     password: string;
@@ -360,28 +359,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const loginWithGoogle = useCallback(async () => {
-    setError(null);
-    if (!isSupabaseConfigured) {
-      const m = `La app no tiene configurado Supabase en este despliegue. ${SUPABASE_ENV_HINT}`;
-      setError(m);
-      throw new Error(m);
-    }
-    markExpectFreshDropiLogin();
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: `${window.location.origin}/dashboard` },
-      });
-      if (error) throw error;
-    } catch (err) {
-      clearExpectFreshDropiLoginMarker();
-      const msg = err instanceof Error ? err.message : 'Error al iniciar sesión con Google';
-      setError(msg);
-      throw err;
-    }
-  }, []);
-
   const register = useCallback(async (userData: {
     email: string;
     password: string;
@@ -532,7 +509,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading,
     isAuthenticated,
     login,
-    loginWithGoogle,
     register,
     resendVerificationEmail,
     logout,
@@ -540,7 +516,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updatePassword,
     error,
     clearError,
-  }), [user, isLoading, isAuthenticated, login, loginWithGoogle, register, resendVerificationEmail, logout, updateProfile, updatePassword, error, clearError]);
+  }), [user, isLoading, isAuthenticated, login, register, resendVerificationEmail, logout, updateProfile, updatePassword, error, clearError]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
